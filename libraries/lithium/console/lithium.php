@@ -15,17 +15,21 @@ use lithium\console\Dispatcher;
  * Determine if we're in an application context by moving up the directory tree looking for
  * a `config` directory with a `bootstrap.php` file in it.  If no application context is found,
  * just boot up the core framework.
+ *
+ * You can set an environment variable if your application isn't called
+ * “app”, i.e. via `export LITHIUM_APP=myapp` on UNIX.
  */
 
 $library = dirname(dirname(__DIR__));
+$appname = getenv('LITHIUM_APP') ?: 'app';
 $app = null;
 $working = getcwd() ?: __DIR__;
 
 while (!$app && $working) {
-	if (file_exists($working . '/config/bootstrap.php')) {
+	if (file_exists("{$working}/config/bootstrap.php")) {
 		$app = $working;
-	} elseif (file_exists($working . '/app/config/bootstrap.php')) {
-		$app = $working . '/app';
+	} elseif (file_exists("{$working}/{$appname}/config/bootstrap.php")) {
+		$app = "{$working}/{$appname}";
 	} else {
 		$working = ($parent = dirname($working)) != $working ? $parent : false;
 	}
@@ -35,7 +39,7 @@ if ($app) {
 	include $app . '/config/bootstrap.php';
 } else {
 	define('LITHIUM_LIBRARY_PATH', $library);
-	define('LITHIUM_APP_PATH', dirname($library) . '/app');
+	define('LITHIUM_APP_PATH', dirname($library) . '/' . $appname);
 
 	if (!include LITHIUM_LIBRARY_PATH . '/lithium/core/Libraries.php') {
 		$message  = "Lithium core could not be found.  Check the value of `LITHIUM_LIBRARY_PATH` ";
