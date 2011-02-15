@@ -263,7 +263,7 @@ class Request extends \lithium\net\http\Message {
 	 * @todo Refactor to lazy-load environment settings
 	 */
 	public function env($key) {
-		if ($key == 'base') {
+		if (strtolower($key) == 'base') {
 			return $this->_base;
 		}
 
@@ -316,11 +316,17 @@ class Request extends \lithium\net\http\Message {
 	}
 
 	/**
-	 * Returns the type of content that the client is requesting.
+	 * Returns information about the type of content that the client is requesting.
 	 *
-	 * @see lithium\net\http\Media
+	 * @see lithium\net\http\Media::negotiate()
+	 * @param $type mixed If not specified, returns the media type name that the client prefers,
+	 *              using content negotiation. If a media type name (string) is passed, returns
+	 *              `true` or `false`, indicating whether or not that type is accepted by the client
+	 *              at all. If `true`, returns the raw content types from the `Accept` header,
+	 *              parsed into an array and sorted by client preference.
 	 * @return string Returns a simple type name if the type is registered (i.e. `'json'`), or
-	 *         a fully-qualified content-type if not (i.e. `'image/jpeg'`).
+	 *         a fully-qualified content-type if not (i.e. `'image/jpeg'`), or a boolean or array,
+	 *         depending on the value of `$type`.
 	 */
 	public function accepts($type = null) {
 		if ($type === true) {
@@ -329,18 +335,8 @@ class Request extends \lithium\net\http\Message {
 		if (!$type && isset($this->params['type'])) {
 			return $this->params['type'];
 		}
-		$accept = $this->_parseAccept();
-
-		if (!$type && !$accept) {
-			return 'html';
-		}
 		$media = $this->_classes['media'];
-
-		foreach ($accept as $type) {
-			if ($result = $media::type($type)) {
-				return $result['content'];
-			}
-		}
+		return $media::negotiate($this) ?: 'html';
 	}
 
 	protected function _parseAccept() {
@@ -350,26 +346,20 @@ class Request extends \lithium\net\http\Message {
 		$accept = $this->env('HTTP_ACCEPT');
 		$accept = (strpos($accept, ',') === false) ? array('text/html') : explode(',', $accept);
 
-		foreach ($accept as $i => $type) {
+		foreach (array_reverse($accept) as $i => $type) {
 			unset($accept[$i]);
-			list($type, $q) = (explode(';q=', $type, 2) + array($type, '1.0'));
-
-			if ($type == '*/*') {
-				$q = 0.1;
-			}
-			$accept[$type] = floatval($q);
+			list($type, $q) = (explode(';q=', $type, 2) + array($type, 1.0 + $i / 100));
+			$accept[$type] = ($type == '*/*') ? 0.1 : floatval($q);
 		}
 		arsort($accept, SORT_NUMERIC);
 
-		if (isset($accept['text/html']) || isset($accept['application/xhtml+xml'])) {
+		if (isset($accept['application/xhtml+xml']) && $accept['application/xhtml+xml'] >= 1) {
 			unset($accept['application/xml']);
 		}
 		$media = $this->_classes['media'];
 
-		if (isset($this->params['type'])) {
-			$handler = $media::type($this->params['type']);
-
-			if (isset($handler['options'])) {
+		if (isset($this->params['type']) && ($handler = $media::type($this->params['type']))) {
+			if (isset($handler['content'])) {
 				$type = (array) $handler['content'];
 				$accept = array(current($type) => 1) + $accept;
 			}
@@ -378,10 +368,31 @@ class Request extends \lithium\net\http\Message {
 	}
 
 	/**
-	 * Uses a custom prefix syntax to extract specific data points from the request.
+	 * This method allows easy extraction of any request data using a prefixed key syntax. By
+	 * passing keys in the form of `'prefix:key'`, it is possible to query different information of
+	 * various different types, including GET and POST data, and server environment variables. The
+	 * full list of prefixes is as follows:
 	 *
-	 * @param string $key data:title, env:base
-	 * @return string
+	 * - `'data'`: Retrieves values from POST data.
+	 * - `'params'`: Retrieves query parameters returned from the routing system.
+	 * - `'query'`: Retrieves values from GET data.
+	 * - `'env'`: Retrieves values from the server or environment, such as `'env:https'`, or custom
+	 *   environment values, like `'env:base'`. See the `env()` method for more info.
+	 * - `'http'`: Retrieves header values (i.e. `'http:accept'`), or the HTTP request method (i.e.
+	 *   `'http:method'`).
+	 *
+	 * This method is used in several different places in the framework in order to provide the
+	 * ability to act conditionally on different aspects of the request. See `Media::type()` (the
+	 * section on content negotiation) and the routing system for more information.
+	 *
+	 *  _Note_: All keys should be _lower-cased_, even when getting HTTP headers.
+	 * @see lithium\action\Request::env()
+	 * @see lithium\net\http\Media::type()
+	 * @see lithium\net\http\Router
+	 * @param string $key A prefixed key indiciating what part of the request data the requested
+	 *               value should come from, and the name of the value to retrieve, in lower case.
+	 * @return string Returns the value of a GET, POST, routing or environment variable, or an
+	 *         HTTP header or method name.
 	 */
 	public function get($key) {
 		list($var, $key) = explode(':', $key);
@@ -390,7 +401,7 @@ class Request extends \lithium\net\http\Message {
 			case in_array($var, array('params', 'data', 'query')):
 				return isset($this->{$var}[$key]) ? $this->{$var}[$key] : null;
 			case ($var === 'env'):
-				return $this->env($key);
+				return $this->env(strtoupper($key));
 			case ($var === 'http' && $key === 'method'):
 				return $this->env('REQUEST_METHOD');
 			case ($var === 'http'):
@@ -444,22 +455,36 @@ class Request extends \lithium\net\http\Message {
 	 */
 	public function type($type = null) {
 		if ($type === null) {
-			$type = $this->type;
-
-			if (!$type) {
-				$type = $this->env('CONTENT_TYPE');
-			}
+			$type = $this->type ?: $this->env('CONTENT_TYPE');
 		}
 		return parent::type($type);
 	}
 
 	/**
-	 * Creates a 'detector' used with Request::is().  A detector is a boolean check that is created
-	 * to determine something about a request.
+	 * Creates a _detector_ used with `Request::is()`.  A detector is a boolean check that is
+	 * created to determine something about a request.
+	 *
+	 * A detector check can be either an exact string match or a regular expression match against a
+	 * header or environment variable. A detector check can also be a closure that accepts the
+	 * `Request` object instance as a parameter.
+	 *
+	 * For example, to detect whether a request is from an iPhone, you can do the following:
+	 * {{{ embed:lithium\tests\cases\action\RequestTest::testDetect(11-12) }}}
 	 *
 	 * @see lithium\action\Request::is()
-	 * @param string $flag
-	 * @param boolean $detector
+	 * @param string $flag The name of the detector check. Used in subsequent calls to
+	 *               `Request::is()`.
+	 * @param mixed $detector Detectors can be specified in four different ways:
+	 *              - The name of an HTTP header or environment variable. If a string, calling the
+	 *                detector will check that the header or environment variable exists and is set
+	 *                to a non-empty value.
+	 *              - A two-element array containing a header/environment variable name, and a value
+	 *                to match against. The second element of the array must be an exact match to
+	 *                the header or variable value.
+	 *              - A two-element array containing a header/environment variable name, and a
+	 *                regular expression that matches against the value, as in the example above.
+	 *              - A closure which accepts an instance of the `Request` object and returns a
+	 *                boolean value.
 	 * @return void
 	 */
 	public function detect($flag, $detector = null) {

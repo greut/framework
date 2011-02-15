@@ -387,7 +387,7 @@ class DatabaseTest extends \lithium\test\Unit {
 			'data' => array('published' => false),
 			'model' => $this->_model
 		));
-		$sql = "UPDATE {mock_database_posts} SET {published} = 0 WHERE {expires} >= '2010-05-13';";
+		$sql = "UPDATE {mock_database_posts} SET {published} = 0 WHERE ({expires} >= '2010-05-13');";
 		$this->assertEqual($sql, $this->db->renderCommand($query));
 	}
 
@@ -395,22 +395,29 @@ class DatabaseTest extends \lithium\test\Unit {
 		$query = new Query(array('type' => 'read', 'model' => $this->_model, 'conditions' => array(
 			'score' => array('between' => array(90, 100))
 		)));
-		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} WHERE {score} ";
-		$sql .= "BETWEEN 90 AND 100;";
+		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} WHERE ({score} ";
+		$sql .= "BETWEEN 90 AND 100);";
 		$this->assertEqual($sql, $this->db->renderCommand($query));
 
 		$query = new Query(array('type' => 'read', 'model' => $this->_model, 'conditions' => array(
 			'score' => array('>' => 90, '<' => 100)
 		)));
 		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} WHERE ";
-		$sql .= "{score} > 90 AND {score} < 100;";
+		$sql .= "({score} > 90 AND {score} < 100);";
 		$this->assertEqual($sql, $this->db->renderCommand($query));
 
 		$query = new Query(array('type' => 'read', 'model' => $this->_model, 'conditions' => array(
 			'score' => array('!=' => array(98, 99, 100))
 		)));
 		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} ";
-		$sql .= "WHERE {score} NOT IN (98, 99, 100);";
+		$sql .= "WHERE ({score} NOT IN (98, 99, 100));";
+		$this->assertEqual($sql, $this->db->renderCommand($query));
+
+		$query = new Query(array('type' => 'read', 'model' => $this->_model, 'conditions' => array(
+			'scorer' => array('like' => '%howard%')
+		)));
+		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} ";
+		$sql .= "WHERE ({scorer} like '%howard%');";
 		$this->assertEqual($sql, $this->db->renderCommand($query));
 
 		$conditions = "custom conditions string";
@@ -418,6 +425,32 @@ class DatabaseTest extends \lithium\test\Unit {
 			'type' => 'read', 'model' => $this->_model
 		));
 		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} WHERE {$conditions};";
+		$this->assertEqual($sql, $this->db->renderCommand($query));
+
+		$query = new Query(array(
+			'type' => 'read', 'model' => $this->_model,
+			'conditions' => array(
+				'field' => array('like' => '%value%')
+			)
+		));
+		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} WHERE ({field} like '%value%');";
+		$this->assertEqual($sql, $this->db->renderCommand($query));
+
+		$query = new Query(array(
+			'type' => 'read', 'model' => $this->_model,
+			'conditions' => array(
+				'or' => array(
+					'field1' => 'value1',
+					'field2' => 'value2',
+					'and' => array(
+						'sField' => '1',
+						'sField2' => '2'
+					)
+				),
+				'bField' => '3'
+			)
+		));
+		$sql = "SELECT * FROM {mock_database_posts} AS {MockDatabasePost} WHERE ({field1} = 'value1' OR {field2} = 'value2' OR ({sField} = 1 AND {sField2} = 2)) AND {bField} = 3;";
 		$this->assertEqual($sql, $this->db->renderCommand($query));
 	}
 

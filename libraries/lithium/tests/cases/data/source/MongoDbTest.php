@@ -21,6 +21,7 @@ use lithium\data\Connections;
 use lithium\data\model\Query;
 use lithium\data\entity\Document;
 use lithium\tests\mocks\data\MockPost;
+use lithium\data\collection\DocumentSet;
 use lithium\data\collection\DocumentArray;
 use lithium\tests\mocks\data\source\MockMongoConnection;
 
@@ -93,6 +94,7 @@ class MongoDbTest extends \lithium\test\Unit {
 		$this->db = Connections::get('lithium_mongo_test');
 		$model = $this->_model;
 		$model::config(array('key' => '_id'));
+		$model::resetConnection(false);
 
 		$this->query = new Query(compact('model') + array(
 			'entity' => new Document(compact('model'))
@@ -244,7 +246,7 @@ class MongoDbTest extends \lithium\test\Unit {
 		$this->db->create($this->query);
 
 		$result = $this->db->read($this->query);
-		$this->assertTrue($result == true);
+		$this->assertTrue($result instanceof DocumentSet);
 		$this->assertEqual(1, $result->count());
 
 		$expected = $data['title'];
@@ -284,7 +286,7 @@ class MongoDbTest extends \lithium\test\Unit {
 
 		$this->assertEqual(array('_id', 'title'), array_keys($original));
 		$this->assertEqual('Test Post', $original['title']);
-		$this->assertPattern('/[0-9a-f]{24}/', $original['_id']);
+		$this->assertPattern('/^[0-9a-f]{24}$/', $original['_id']);
 
 		$this->query = new Query(compact('model') + array(
 			'data' => array('title' => 'New Post Title'),
@@ -441,6 +443,7 @@ class MongoDbTest extends \lithium\test\Unit {
 	}
 
 	public function testRelationshipGeneration() {
+		$this->skipIf(true, "Temporarily disabled.");
 		Connections::add('mock-source', $this->_testConfig);
 		$from = 'lithium\tests\mocks\data\MockComment';
 		$to = 'lithium\tests\mocks\data\MockPost';
@@ -531,57 +534,6 @@ class MongoDbTest extends \lithium\test\Unit {
 		$this->assertEqual(array('_id' => 'custom'), $model::first('custom')->data());
 	}
 
-	/**
-	 * Tests handling type values based on specified schema settings.
-	 *
-	 * @return void
-	 */
-	public function testTypeCasting() {
-		$data = array(
-			'_id' => '4c8f86167675abfabd970300',
-			'title' => 'Foo',
-			'tags' => 'test',
-			'comments' => array(
-				"4c8f86167675abfabdbe0300", "4c8f86167675abfabdbf0300", "4c8f86167675abfabdc00300"
-			),
-			'authors' => '4c8f86167675abfabdb00300',
-			'created' => time(),
-			'modified' => date('Y-m-d H:i:s'),
-			'rank_count' => '45',
-			'rank' => '3.45688'
-		);
-		$time = time();
-		$result = $this->db->cast($this->_model, $data, array('schema' => $this->_schema));
-
-		$this->assertEqual(array_keys($data), array_keys($result));
-		$this->assertTrue($result['_id'] instanceOf MongoId);
-		$this->assertEqual('4c8f86167675abfabd970300', (string) $result['_id']);
-
-		$this->assertTrue($result['comments'] instanceOf DocumentArray);
-		$this->assertEqual(3, count($result['comments']));
-
-		$this->assertTrue($result['comments'][0] instanceOf MongoId);
-		$this->assertTrue($result['comments'][1] instanceOf MongoId);
-		$this->assertTrue($result['comments'][2] instanceOf MongoId);
-		$this->assertEqual('4c8f86167675abfabdbe0300', (string) $result['comments'][0]);
-		$this->assertEqual('4c8f86167675abfabdbf0300', (string) $result['comments'][1]);
-		$this->assertEqual('4c8f86167675abfabdc00300', (string) $result['comments'][2]);
-
-		$this->assertEqual($data['comments'], $result['comments']->data());
-		$this->assertEqual(array('test'), $result['tags']->data());
-		$this->assertEqual(array('4c8f86167675abfabdb00300'), $result['authors']->data());
-		$this->assertTrue($result['authors'][0] instanceOf MongoId);
-
-		$this->assertTrue($result['modified'] instanceOf MongoDate);
-		$this->assertTrue($result['created'] instanceOf MongoDate);
-
-		$this->assertEqual($time, $result['modified']->sec);
-		$this->assertEqual($time, $result['created']->sec);
-
-		$this->assertIdentical(45, $result['rank_count']);
-		$this->assertIdentical(3.45688, $result['rank']);
-	}
-
 	public function testCastingConditionsValues() {
 		$query = new Query(array('schema' => $this->_schema));
 
@@ -625,27 +577,48 @@ class MongoDbTest extends \lithium\test\Unit {
 		$this->assertTrue($result['$or'][1]['guid'] instanceOf MongoId);
 	}
 
-	public function testNestedObjectCasting() {
-		$data = array('notifications' => array(
-			'foo' => '',
-			'bar' => '1',
-			'baz' => 0
-		));
-		$model = $this->_model;
-		$schema = $model::schema();
-		$model::schema($this->_schema);
-		$result = $this->db->cast($model, $data);
-		$model::schema($schema);
-
-		$this->assertIdentical(false, $result['notifications']->foo);
-		$this->assertIdentical(true, $result['notifications']->bar);
-		$this->assertIdentical(false, $result['notifications']->baz);
-	}
-
 	public function testMultiOperationConditions() {
 		$conditions = array('loc' => array('$near' => array(50, 50), '$maxDistance' => 5));
 		$result = $this->db->conditions($conditions, $this->query);
 		$this->assertEqual($conditions, $result);
+	}
+
+	public function testCreateWithEmbeddedObjects() {
+		$data = array(
+			'_id' => new MongoId(),
+			'created' => new MongoDate(strtotime('-1 hour')),
+			'list' => array('foo', 'bar', 'baz')
+		);
+		$entity = new Document(compact('data') + array('exists' => false));
+		$query = new Query(array('type' => 'create') + compact('entity'));
+		$result = $query->export($this->db);
+		$this->assertIdentical($data, $result['data']['data']);
+	}
+
+	public function testUpdateWithEmbeddedObjects() {
+		$data = array(
+			'_id' => new MongoId(),
+			'created' => new MongoDate(strtotime('-1 hour')),
+			'list' => array('foo', 'bar', 'baz')
+		);
+		$model = $this->_model;
+		$schema = array('updated' => array('type' => 'MongoDate'));
+		$entity = new Document(compact('data', 'schema', 'model') + array('exists' => true));
+		$entity->updated = time();
+		$entity->list[] = 'dib';
+
+		$query = new Query(array('type' => 'update') + compact('entity'));
+		$result = $query->export($this->db);
+		$this->assertEqual(array('updated'), array_keys($result['data']['update']));
+		$this->assertTrue($result['data']['update']['updated'] instanceof MongoDate);
+	}
+
+	public function testSchemaCallback() {
+		$schema = array('_id' => array('type' => 'id'), 'created' => array('type' => 'date'));
+		$db = new MongoDb(array('autoConnect' => false, 'schema' => function() use ($schema) {
+			return $schema;
+		}));
+		$this->assertEqual($schema, $db->describe(null));
 	}
 }
 

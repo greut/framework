@@ -20,11 +20,6 @@ class ResponseTest extends \lithium\test\Unit {
 		$this->response = new MockResponse(array('init' => false));
 	}
 
-	public function testDefaultTypeInitialization() {
-		$response = new Response(array('request' => new MockRequestType()));
-		$this->assertEqual('foo', $response->type());
-	}
-
 	public function testTypeManipulation() {
 		$this->assertEqual('html', $this->response->type());
 		$this->assertEqual('html', $this->response->type('html'));
@@ -58,6 +53,7 @@ class ResponseTest extends \lithium\test\Unit {
 			'HTTP/1.1 200 OK',
 			'Expires: ' . gmdate('D, d M Y H:i:s', $expires) . ' GMT',
 			'Cache-Control: max-age=' . ($expires - time()),
+			'Pragma: cache'
 		);
 		$this->assertEqual($headers, $this->response->testHeaders);
 
@@ -70,12 +66,13 @@ class ResponseTest extends \lithium\test\Unit {
 			'HTTP/1.1 200 OK',
 			'Expires: ' . gmdate('D, d M Y H:i:s', strtotime($expires)) . ' GMT',
 			'Cache-Control: max-age=' . (strtotime($expires) - time()),
+			'Pragma: cache'
 		);
 		$this->assertEqual($headers, $this->response->testHeaders);
 
 		$this->response->body = 'Created';
 		$this->response->status(201);
-		$this->response->disableCache();
+		$this->response->cache(false);
 
 		ob_start();
 		$this->response->render();
@@ -93,6 +90,9 @@ class ResponseTest extends \lithium\test\Unit {
 			'Pragma: no-cache'
 		);
 		$this->assertEqual($headers, $this->response->testHeaders);
+
+		$this->expectException('/^Request::disableCache\(\)/');
+		$this->response->disableCache();
 	}
 
 	/**

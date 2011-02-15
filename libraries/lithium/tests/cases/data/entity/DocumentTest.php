@@ -8,7 +8,8 @@
 
 namespace lithium\tests\cases\data\entity;
 
-use stdClass;
+use MongoId;
+use MongoDate;
 use lithium\data\Connections;
 use lithium\data\entity\Document;
 use lithium\data\collection\DocumentSet;
@@ -467,8 +468,7 @@ class DocumentTest extends \lithium\test\Unit {
 
 		unset($expected['title']);
 		unset($doc->title);
-		$result = $doc->data();
-		$this->assertEqual($expected, $result);
+		$this->assertEqual($expected, $doc->data());
 
 		unset($expected['parsed']);
 		unset($doc->parsed);
@@ -532,6 +532,21 @@ class DocumentTest extends \lithium\test\Unit {
 		}
 	}
 
+	public function testExport() {
+		$data = array('foo' => 'bar', 'baz' => 'dib');
+		$doc = new Document(compact('data') + array('exists' => false));
+
+		$expected = array(
+			'data' => array('foo' => 'bar', 'baz' => 'dib'),
+			'update' => array(),
+			'remove' => array(),
+			'increment' => array(),
+			'key' => '',
+			'exists' => false
+		);
+		$this->assertEqual($expected, $doc->export());
+	}
+
 	/**
 	 * Tests that a modified `Document` exports the proper fields in a newly-appended nested
 	 * `Document`.
@@ -539,40 +554,82 @@ class DocumentTest extends \lithium\test\Unit {
 	 * @return void
 	 */
 	public function testModifiedExport() {
-		$database = new MockDocumentSource();
 		$model = $this->_model;
 		$data = array('foo' => 'bar', 'baz' => 'dib');
-		$doc = new Document(compact('model', 'data'));
+		$doc = new Document(compact('model', 'data') + array('exists' => false));
 
 		$doc->nested = array('more' => 'data');
-		$newData = $doc->export($database);
+		$newData = $doc->export();
 
-		$expected = array('foo' => 'bar', 'baz' => 'dib', 'nested' => array('more' => 'data'));
-		$this->assertEqual($expected, $newData);
+		$expected = array('foo' => 'bar', 'baz' => 'dib', 'nested.more' => 'data');
+		$this->assertFalse($newData['exists']);
+		$this->assertEqual(array('foo' => 'bar', 'baz' => 'dib'), $newData['data']);
+		$this->assertEqual(1, count($newData['update']));
+		$this->assertTrue($newData['update']['nested'] instanceof Document);
 
-		$doc = new Document(array('model' => $model, 'exists' => true, 'data' => array(
+		$result = $newData['update']['nested']->export();
+		$this->assertFalse($result['exists']);
+		$this->assertEqual(array('more' => 'data'), $result['data']);
+		$this->assertFalse($result['update']);
+		$this->assertEqual('nested', $result['key']);
+
+		$doc = new Document(compact('model') + array('exists' => true, 'data' => array(
 			'foo' => 'bar', 'baz' => 'dib'
 		)));
-		$this->assertFalse($doc->export($database));
+
+		$result = $doc->export();
+		$this->assertFalse($result['update']);
 
 		$doc->nested = array('more' => 'data');
 		$this->assertEqual('data', $doc->nested->more);
 
-		$modified = $doc->export($database);
-		$this->assertEqual(array('nested' => array('more' => 'data')), $modified);
+		$modified = $doc->export();
+		$this->assertTrue($modified['exists']);
+		$this->assertEqual(array('foo' => 'bar', 'baz' => 'dib'), $modified['data']);
+		$this->assertEqual(array('nested'), array_keys($modified['update']));
+		$this->assertNull($modified['key']);
+
+		$nested = $modified['update']['nested']->export();
+		$this->assertFalse($nested['exists']);
+		$this->assertEqual(array('more' => 'data'), $nested['data']);
+		$this->assertEqual('nested', $nested['key']);
 
 		$doc->update();
-		$this->assertFalse($doc->export($database));
+		$result = $doc->export();
+		$this->assertFalse($result['update']);
 
 		$doc->more = 'cowbell';
 		$doc->nested->evenMore = 'cowbell';
-		$modified = $doc->export($database);
-		$expected = array('nested' => array('evenMore' => 'cowbell'), 'more' => 'cowbell');
-		$this->assertEqual($expected, $modified);
+		$modified = $doc->export();
+		$expected = array('more' => 'cowbell');
+		$this->assertEqual($expected, $modified['update']);
+		$this->assertEqual(array('nested', 'foo', 'baz'), array_keys($modified['data']));
+		$this->assertEqual('bar', $modified['data']['foo']);
+		$this->assertEqual('dib', $modified['data']['baz']);
+
+		$nested = $modified['data']['nested']->export();
+		$this->assertTrue($nested['exists']);
+		$this->assertEqual(array('more' => 'data'), $nested['data']);
+		$this->assertEqual(array('evenMore' => 'cowbell'), $nested['update']);
+		$this->assertEqual('nested', $nested['key']);
 
 		$doc->update();
 		$doc->nested->evenMore = 'foo!';
-		$this->assertEqual(array('nested' => array('evenMore' => 'foo!')), $doc->export($database));
+		$modified = $doc->export();
+		$this->assertFalse($modified['update']);
+
+		$nested = $modified['data']['nested']->export();
+		$this->assertEqual(array('evenMore' => 'foo!'), $nested['update']);
+	}
+
+	public function testArrayConversion() {
+		$doc = new Document(array('data' => array(
+			'id' => new MongoId(),
+			'date' => new MongoDate()
+		)));
+		$result = $doc->data();
+		$this->assertPattern('/^[a-f0-9]{24}$/', $result['id']);
+		$this->assertEqual(time(), $result['date']);
 	}
 }
 

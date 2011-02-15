@@ -71,7 +71,14 @@ abstract class Database extends \lithium\data\Source {
 		'!=' => array('multiple' => 'NOT IN'),
 		'<>' => array('multiple' => 'NOT IN'),
 		'between' => array('format' => 'BETWEEN ? AND ?'),
-		'BETWEEN' => array('format' => 'BETWEEN ? AND ?')
+		'BETWEEN' => array('format' => 'BETWEEN ? AND ?'),
+		'like' => array(),
+		'LIKE' => array()
+	);
+
+	protected $_constraintTypes = array(
+		'AND' => true,
+		'OR' => true
 	);
 
 	/**
@@ -241,7 +248,7 @@ abstract class Database extends \lithium\data\Source {
 	 * @filter
 	 */
 	public function read($query, array $options = array()) {
-		$defaults = array('return' => 'item', 'schema' => array());
+		$defaults = array('return' => is_string($query) ? 'array' : 'item', 'schema' => array());
 		$options += $defaults;
 
 		return $this->_filter(__METHOD__, compact('query', 'options'), function($self, $params) {
@@ -341,7 +348,9 @@ abstract class Database extends \lithium\data\Source {
 
 		switch ($type) {
 			case 'count':
-				$fields = $this->fields($query->fields(), $query);
+				if (strpos($fields = $this->fields($query->fields(), $query), ',') !== false) {
+					$fields = "*";
+				}
 				$query->fields("COUNT({$fields}) as count", true);
 				$query->map(array($query->model() => array('count')));
 				list($record) = $this->read($query, $options)->data();
@@ -410,11 +419,15 @@ abstract class Database extends \lithium\data\Source {
 		}
 		$namespace = preg_replace('/\w+$/', '', $model);
 		$relations = $model ? $model::relations() : array();
+		$schema = $model::schema();
 
 		foreach ($fields as $scope => $field) {
 			switch (true) {
 				case (is_numeric($scope) && $field == '*'):
 					$result[$model] = array_keys($model::schema());
+				break;
+				case (is_numeric($scope) && isset($schema[$field])):
+					$result[$model][] = $field;
 				break;
 				case (is_numeric($scope) && isset($relations[$field])):
 					$scope = $field;
@@ -465,32 +478,57 @@ abstract class Database extends \lithium\data\Source {
 
 		foreach ($conditions as $key => $value) {
 			$schema[$key] = isset($schema[$key]) ? $schema[$key] : array();
+			$return = $this->_processConditions($key,$value, $schema);
 
-			switch (true) {
-				case (is_numeric($key) && is_string($value)):
-					$result[] = $value;
-				break;
-				case (is_string($key) && is_object($value)):
-					$value = trim(rtrim($this->renderCommand($value), ';'));
-					$result[] = "{$key} IN ({$value})";
-				break;
-				case (is_string($key) && is_array($value) && isset($ops[key($value)])):
-					foreach ($value as $op => $val) {
-						$result[] = $this->_operator($key, array($op => $val), $schema[$key]);
-					}
-				break;
-				case (is_string($key) && is_array($value)):
-					$value = join(', ', $this->value($value, $schema));
-					$result[] = "{$key} IN ({$value})";
-				break;
-				default:
-					$value = $this->value($value, $schema);
-					$result[] = "{$key} = {$value}";
-				break;
+			if ($return) {
+				$result[] = $return;
 			}
 		}
 		$result = join(" AND ", $result);
 		return ($options['prepend'] && !empty($result)) ? "WHERE {$result}" : $result;
+	}
+
+	protected function _processConditions($key, $value, $schema, $glue = 'AND'){
+		$constraintTypes = &$this->_constraintTypes;
+
+		switch (true) {
+			case (is_numeric($key) && is_string($value)):
+				return $value;
+			case is_string($value):
+				return $this->name($key) . ' = ' . $this->value($value);
+			case is_numeric($key) && is_array($value):
+				$result = array();
+				foreach($value as $cField => $cValue) {
+					$result[] = $this->_processConditions($cField, $cValue, $schema, $glue);
+				}
+				return '(' . implode(' ' . $glue . ' ', $result) . ')';
+			case (is_string($key) && is_object($value)):
+				$value = trim(rtrim($this->renderCommand($value), ';'));
+				return "{$key} IN ({$value})";
+			case is_array($value) && isset($constraintTypes[strtoupper($key)]):
+				$result = array();
+				$glue = strtoupper($key);
+
+				foreach($value as $cField => $cValue) {
+					$result[] = $this->_processConditions($cField, $cValue, $schema, $glue);
+				}
+				return '(' . implode(' ' . $glue . ' ', $result) . ')';
+			case (is_string($key) && is_array($value) && isset($this->_operators[key($value)])):
+				foreach ($value as $op => $val) {
+					$result[] = $this->_operator($key, array($op => $val), $schema[$key]);
+				}
+				return '(' . implode(' ' . $glue . ' ', $result) . ')';
+			case is_array($value):
+				$value = join(', ', $this->value($value, $schema));
+				return "{$key} IN ({$value})";
+			default:
+				if (isset($value)) {
+					$value = $this->value($value, $schema);
+					return "{$key} = {$value}";
+				}
+				break;
+		}
+		return false;
 	}
 
 	/**
@@ -630,7 +668,7 @@ abstract class Database extends \lithium\data\Source {
 		return $alias ? "AS " . $this->name($alias) : null;
 	}
 
-	public function cast($model, array $data, array $options = array()) {
+	public function cast($entity, array $data, array $options = array()) {
 		return $data;
 	}
 
