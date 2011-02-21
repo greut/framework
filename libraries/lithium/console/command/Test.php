@@ -98,6 +98,9 @@ class Test extends \lithium\console\Command {
 
 		$this->hr();
 		$this->nl();
+
+		$stats = $report->stats();
+		return $stats['success'] ? 0 : 1;
 	}
 
 	/**
