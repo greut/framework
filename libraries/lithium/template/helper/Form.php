@@ -416,7 +416,7 @@ class Form extends \lithium\template\Helper {
 		$type = $options['type'];
 		$label = $input = null;
 
-		if ($options['label'] === null || $options['label']) {
+		if (($options['label'] === null || $options['label']) && $options['type'] != 'hidden') {
 			$for = isset($options['id']) ? $options['id'] : '';
 			$label = $options['label'] ?: $options['label'] = Inflector::humanize($name);
 			$label = $this->label($for, $label);
@@ -608,7 +608,7 @@ class Form extends \lithium\template\Helper {
 	/**
 	 * Generates an HTML `<label></label>` object.
 	 *
-	 * @param string $name The name of the field that the label is for.
+	 * @param string $name The DOM ID of the field that the label is for.
 	 * @param string $title The content inside the `<label></label>` object.
 	 * @param array $options Besides HTML attributes, this parameter allows one additional flag:
 	 *              - `'escape'` _boolean_: Defaults to `true`. Indicates whether the title of the
