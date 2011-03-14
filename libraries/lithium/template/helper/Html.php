@@ -25,7 +25,7 @@ class Html extends \lithium\template\Helper {
 		'block'            => '<div{:options}>{:content}</div>',
 		'block-end'        => '</div>',
 		'block-start'      => '<div{:options}>',
-		'charset'     => '<meta http-equiv="Content-Type" content="{:type}; charset={:charset}" />',
+		'charset'          => '<meta charset="{:encoding}" />',
 		'image'            => '<img src="{:path}"{:options} />',
 		'js-block'         => '<script type="text/javascript"{:options}>{:content}</script>',
 		'js-end'           => '</script>',
@@ -83,15 +83,35 @@ class Html extends \lithium\template\Helper {
 	);
 
 	/**
-	 * Returns a charset meta-tag.
+	 * Returns a charset meta-tag for declaring the encoding of the document.
 	 *
-	 * @param string $charset The character set to be used in the meta tag. Example: `"utf-8"`.
-	 * @return string A meta tag containing the specified character set.
+	 * The terms character set (here: charset) and character encoding (here:
+	 * encoding) were historically synonymous. The terms now have related but
+	 * distinct meanings. Whenever possible Lithium tries to use precise
+	 * terminology. Since HTML uses the term `charset` we expose this method
+	 * under the exact same name. This caters to the expectation towards a HTML
+	 * helper. However the rest of the framework will use the term `encoding`
+	 * when talking about character encoding.
+	 *
+	 * It is suggested that uppercase letters should be used when specifying
+	 * the encoding. HTML specs don't require it to be uppercase and sites in
+	 * the wild most often use the lowercase variant. On the other hand must
+	 * XML parsers (those may not be relevant in this context anyway) not
+	 * support lowercase encodings. This and the fact that IANA lists only
+	 * encodings with uppercase characters led to the above suggestion.
+	 *
+	 * @see lithium\net\http\Response::$encoding
+	 * @link http://www.iana.org/assignments/character-sets
+	 * @param string $encoding The character encoding to be used in the meta tag.
+	 *        Defaults to the encoding of the `Response` object attached to the
+	 *        current context. The default encoding of that object is `UTF-8`.
+	 *        The string given here is not manipulated in any way, so that
+	 *        values are rendered literally. Also see above note about casing.
+	 * @return string A meta tag containing the specified encoding (literally).
 	 */
-	public function charset($charset = null) {
-		$options = array('type' => 'text/html');
-		$options['charset'] = $charset ?: 'utf-8';
-		return $this->_render(__METHOD__, 'charset', $options);
+	public function charset($encoding = null) {
+		$encoding = $encoding ?: $this->_context->response()->encoding;
+		return $this->_render(__METHOD__, 'charset', compact('encoding'));
 	}
 
 	/**
@@ -194,6 +214,7 @@ class Html extends \lithium\template\Helper {
 			$this->_context->styles($style);
 		}
 	}
+
 	/**
 	 * Creates a tag for the ```<head>``` section of your document.
 	 *

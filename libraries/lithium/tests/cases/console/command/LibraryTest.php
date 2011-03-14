@@ -22,7 +22,7 @@ class LibraryTest extends \lithium\test\Unit {
 	protected $_testPath = null;
 
 	public function skip() {
-		$this->_testPath = LITHIUM_APP_PATH . '/resources/tmp/tests';
+		$this->_testPath = Libraries::get(true, 'resources') . '/tmp/tests';
 		$this->skipIf(!is_writable($this->_testPath), "{$this->_testPath} is not writable.");
 	}
 
@@ -63,9 +63,7 @@ class LibraryTest extends \lithium\test\Unit {
 		$result = $this->library->config('server', 'lab.lithify.me');
 		$this->assertTrue($result);
 
-		$expected = array('servers' => array(
-			'lab.lithify.me' => true
-		));
+		$expected = array('servers' => array('lab.lithify.me' => true));
 		$result = json_decode(file_get_contents($this->testConf), true);
 		$this->assertEqual($expected, $result);
 
@@ -86,9 +84,8 @@ class LibraryTest extends \lithium\test\Unit {
 		$this->skipIf(!extension_loaded('zlib'), 'The zlib extension is not loaded.');
 		$this->library->library = 'library_test';
 
-		$expected = true;
 		$result = $this->library->extract($this->_testPath . '/library_test');
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 
 		$expected = "library_test created in {$this->_testPath} from ";
 		$expected .= realpath(LITHIUM_LIBRARY_PATH)
@@ -106,10 +103,9 @@ class LibraryTest extends \lithium\test\Unit {
 
 		$this->library->library = 'library_test';
 
-		$expected = true;
 		$testPath = "{$this->_testPath}/library_test";
 		$result = $this->library->archive($testPath, $testPath);
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 
 		$expected = "library_test.phar.gz created in {$this->_testPath} from ";
 		$expected .= "{$this->_testPath}/library_test\n";
@@ -126,11 +122,10 @@ class LibraryTest extends \lithium\test\Unit {
 		);
 		$this->library->library = 'library_test';
 
-		$expected = true;
 		$result = $this->library->extract(
 			$this->_testPath . '/library_test.phar.gz', $this->_testPath . '/new'
 		);
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 
 		$this->assertTrue(file_exists($this->_testPath . '/new'));
 
@@ -156,22 +151,20 @@ class LibraryTest extends \lithium\test\Unit {
 		);
 
 		chdir('new');
-		$app = new Library(array(
-			'request' => new Request(), 'classes' => $this->classes
-		));
+		$app = new Library(array('request' => new Request(), 'classes' => $this->classes));
 		$app->library = 'does_not_exist';
 
-		$expected = true;
 		$result = $app->archive();
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 
-		$expected = "new.phar.gz created in {$this->_testPath} from ";
-		$expected .= "{$this->_testPath}/new\n";
+		$path = realpath($this->_testPath);
+		$expected = "new.phar.gz created in {$path} from {$path}/new\n";
 		$result = $app->response->output;
 		$this->assertEqual($expected, $result);
 
 		Phar::unlinkArchive($this->_testPath . '/new.phar');
 		Phar::unlinkArchive($this->_testPath . '/new.phar.gz');
+
 		$this->_cleanUp('tests/new');
 		rmdir($this->_testPath . '/new');
 	}
@@ -179,20 +172,17 @@ class LibraryTest extends \lithium\test\Unit {
 	public function testExtractWhenLibraryDoesNotExist() {
 		$this->skipIf(!extension_loaded('zlib'), 'The zlib extension is not loaded.');
 		chdir($this->_testPath);
-		$app = new Library(array(
-			'request' => new Request(), 'classes' => $this->classes
-		));
+		$app = new Library(array('request' => new Request(), 'classes' => $this->classes));
 		$app->library = 'does_not_exist';
 
-		$expected = true;
 		$result = $app->extract();
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 
 		$this->assertTrue(file_exists($this->_testPath . '/new'));
 
-		$expected = "new created in {$this->_testPath} from ";
-		$expected .= realpath(LITHIUM_LIBRARY_PATH)
-			. "/lithium/console/command/create/template/app.phar.gz\n";
+		$path = realpath($this->_testPath);
+		$tplPath = realpath(LITHIUM_LIBRARY_PATH) . '/lithium/console/command/create/template';
+		$expected = "new created in {$path} from {$tplPath}/app.phar.gz\n";
 		$result = $app->response->output;
 		$this->assertEqual($expected, $result);
 
@@ -204,9 +194,8 @@ class LibraryTest extends \lithium\test\Unit {
 		$this->library->library = 'library_plugin_test';
 		$path = $this->_testPath;
 
-		$expected = true;
 		$result = $this->library->extract('plugin', "{$path}/library_test_plugin");
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 
 		$expected = "library_test_plugin created in {$path} from " . realpath(LITHIUM_LIBRARY_PATH);
 		$expected .= "/lithium/console/command/create/template/plugin.phar.gz\n";
@@ -607,9 +596,8 @@ test;
 		$this->library->library = 'library_plugin_test';
 		$path = $this->_testPath;
 
-		$expected = true;
 		$result = $this->library->extract('plugin', "{$path}/library_test_plugin");
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 		$this->library->response->output = null;
 
 		$file = $this->_testPath . '/library_test_plugin/config/library_test_plugin.json';

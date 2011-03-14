@@ -96,7 +96,11 @@ class FormTest extends \lithium\test\Unit {
 
 		$result = $this->form->create(null, array('id' => 'Registration'));
 		$this->assertTags($result, array(
-			'form' => array('action' => "{$this->base}posts", 'method' => 'post', 'id' => 'Registration')
+			'form' => array(
+				'action' => "{$this->base}posts",
+				'method' => 'post',
+				'id' => 'Registration'
+			)
 		));
 	}
 
@@ -686,6 +690,35 @@ class FormTest extends \lithium\test\Unit {
 			'div' => array(),
 			'label' => array('for' => 'Name'), 'Enter a name', '/label',
 			'input' => array('type' => 'text', 'name' => 'name', 'id' => 'Name'),
+		));
+	}
+
+	/**
+	 * Demonstrates that the options for a `<label />` element can be passed through the `field()`
+	 * method, using the label text as a key.
+	 *
+	 * @return void
+	 */
+	public function testFieldLabelWithOptions() {
+		$result = $this->form->field('name', array(
+			'label' => array('Item Name' => array('class' => 'required'))
+		));
+		$this->assertTags($result, array(
+			'div' => array(),
+			'label' => array('for' => 'Name', 'class' => 'required'), 'Item Name', '/label',
+			'input' => array('type' => 'text', 'name' => 'name', 'id' => 'Name'),
+		));
+
+		$result = $this->form->field('video_preview', array(
+			'label' => array('<a href="http://www.youtube.com/">Youtube</a>' => array(
+				'escape' => false
+			))
+		));
+		$this->assertTags($result, array(
+			'div' => array(),
+			'label' => array('for' => 'VideoPreview'),
+			'a' => array('href' => 'http://www.youtube.com/'), 'Youtube', '/a', '/label',
+			'input' => array('type' => 'text', 'name' => 'video_preview', 'id' => 'VideoPreview'),
 		));
 	}
 

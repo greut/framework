@@ -374,11 +374,12 @@ class MongoDb extends \lithium\data\Source {
 		return $this->_filter(__METHOD__, $params, function($self, $params) use ($_config, $_exp) {
 			$query   = $params['query'];
 			$options = $params['options'];
-			$data    = $_exp::get('create', $query->entity()->export());
-			$gridCol = "{$_config['gridPrefix']}.files";
-			$source  = $query->source();
 
-			if ($source == $gridCol && isset($data['create']['file'])) {
+			$args    = $query->export($self, array('keys' => array('source', 'data')));
+			$data    = $_exp::get('create', $args['data']);
+			$source  = $args['source'];
+
+			if ($source == "{$_config['gridPrefix']}.files" && isset($data['create']['file'])) {
 				$result = array('ok' => true);
 				$data['create']['_id'] = $self->invokeMethod('_saveFile', array($data['create']));
 			} else {
@@ -450,7 +451,6 @@ class MongoDb extends \lithium\data\Source {
 			$query = $params['query'];
 			$options = $params['options'];
 			$args = $query->export($self);
-			$self->connection->resetError();
 			$source = $args['source'];
 
 			if ($group = $args['group']) {
@@ -505,7 +505,7 @@ class MongoDb extends \lithium\data\Source {
 		return $this->_filter(__METHOD__, $params, function($self, $params) use ($_config, $_exp) {
 			$options = $params['options'];
 			$query  = $params['query'];
-			$args   = $query->export($self, array('keys' => array('conditions', 'source')));
+			$args   = $query->export($self, array('keys' => array('conditions', 'source', 'data')));
 			$source = $args['source'];
 			$data   = $args['data'];
 
@@ -518,6 +518,9 @@ class MongoDb extends \lithium\data\Source {
 			}
 			$update = $query->entity() ? $_exp::toCommand($data) : $data;
 
+			if ($options['multiple'] && !preg_grep('/^\$/', array_keys($update))) {
+				$update = array('$set' => $update);
+			}
 			if ($self->connection->{$source}->update($args['conditions'], $update, $options)) {
 				$query->entity() ? $query->entity()->update() : null;
 				return true;

@@ -61,9 +61,7 @@ class Group extends \lithium\util\Collection {
 			'exclude' => '/mock/',
 			'recursive' => true,
 		);
-		$options += $defaults;
-		$classes = Libraries::locate('tests', null, $options);
-		return $classes;
+		return Libraries::locate('tests', null, $options + $defaults);
 	}
 
 	/**
@@ -107,7 +105,7 @@ class Group extends \lithium\util\Collection {
 
 		foreach ($this->_data as $test) {
 			if (!class_exists($test)) {
-				throw new Exception("Test case '{$test}' not found.");
+				throw new Exception("Test case `{$test}` not found.");
 			}
 			$tests[] = new $test;
 		}

@@ -104,18 +104,15 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 
 	protected function _init() {
 		parent::_init();
-		$this->_data = (array) $this->_data;
+		$data = (array) $this->_data;
+		$this->_data = array();
+		$this->set($data);
+		$exists = $this->_exists;
 
-		if ($model = $this->_model) {
-			if (isset($this->_config['schema'])) {
-				$schema = $this->_config['schema'];
-			} else {
-				$schema = $model::schema();
-			}
-			$pathKey = $this->_pathKey;
-			$options = compact('pathKey', 'schema');
-			$this->_data = $model::connection()->cast($this, $this->_data, $options);
-		}
+		$this->_data = $this->_updated;
+		$this->_updated = array();
+		$this->update();
+		$this->_exists = $exists;
 		unset($this->_autoConfig);
 	}
 
@@ -156,10 +153,13 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 			}
 			if (!isset($this->_data[$name]) && $schema = $model::schema($name)) {
 				$schema = array($name => $schema);
-				$pathKey = $this->_pathKey ? "{$this->_pathKey}.{$name}" : $name;
+				$pathKey = $this->_pathKey ? $this->_pathKey : null;
 				$options = compact('pathKey', 'schema') + array('first' => true);
-				$this->_data[$name] = $conn->cast($this, array($name => null), $options);
-				return $this->_data[$name];
+
+				if (($value = $conn->cast($this, array($name => null), $options)) !== null) {
+					$this->_data[$name] = $value;
+					return $this->_data[$name];
+				}
 			}
 		}
 		if (isset($this->_data[$name])) {
@@ -176,11 +176,7 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 				$this->_updated[$key]->_exists = false;
 			}
 		}
-
-		return parent::export() + array(
-			'key'       => $this->_pathKey,
-			'remove'    => $this->_removed,
-		);
+		return parent::export() + array('key' => $this->_pathKey, 'remove' => $this->_removed);
 	}
 
 	public function update($id = null, array $data = array()) {
@@ -191,6 +187,7 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 				$this->_data[$key]->update(null, isset($data[$key]) ? $data[$key] : array());
 			}
 		}
+		$this->_removed = array();
 	}
 
 	/**
@@ -264,7 +261,7 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 			return $this->_setNested($name, $value);
 		}
 		if ($model = $this->_model) {
-			$pathKey = $this->_pathKey ? $this->_pathKey . '.' : '';
+			$pathKey = $this->_pathKey;
 			$options = compact('pathKey') + array('first' => true);
 			$value = $model::connection()->cast($this, array($name => $value), $options);
 		}
@@ -290,8 +287,8 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 			}
 
 			if ($next === null && ($model = $this->_model)) {
-				$current->_data[$key] = $model::connection()->item($model);
-				$next =& $current->_data[$key];
+				$current->__set($key, $model::connection()->item($model));
+				$next =& $current->{$key};
 			}
 			$current =& $next;
 		}
@@ -327,6 +324,7 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 	 */
 	public function __unset($name) {
 		$this->_removed[$name] = true;
+		unset($this->_updated[$name]);
 	}
 
 	/**
@@ -481,9 +479,9 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 	 * @param string $field The name of the field to be incrememnted.
 	 * @param string $value The value to increment the field by. Defaults to `1` if this parameter
 	 *               is not specified.
-	 * @return int Returns the current value of `$field`, based on the value retrieved from the data
-	 *         source when the entity was loaded, plus any increments applied. Note that it may not
-	 *         reflect the most current value in the persistent backend data source.
+	 * @return integer Returns the current value of `$field`, based on the value retrieved from the
+	 *         data source when the entity was loaded, plus any increments applied. Note that it
+	 *         may not reflect the most current value in the persistent backend data source.
 	 * @throws UnexpectedValueException Throws an exception when `$field` is set to a non-numeric
 	 *         type.
 	 */
@@ -494,7 +492,7 @@ class Document extends \lithium\data\Entity implements \Iterator, \ArrayAccess {
 		$this->_increment[$field] += $value;
 
 		if (!is_numeric($this->_data[$field])) {
-			throw new UnexpectedValueException("Field '{$field}' cannot be incremented.");
+			throw new UnexpectedValueException("Field `{$field}` cannot be incremented.");
 		}
 		$this->_data[$field] += $value;
 	}

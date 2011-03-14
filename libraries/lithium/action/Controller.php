@@ -174,7 +174,7 @@ class Controller extends \lithium\core\Object {
 				throw new DispatchException('Attempted to invoke a private method.');
 			}
 			if (!method_exists($self, $action)) {
-				throw new DispatchException("Action '{$action}' not found.");
+				throw new DispatchException("Action `{$action}` not found.");
 			}
 			$render['template'] = $render['template'] ?: $action;
 
@@ -183,7 +183,9 @@ class Controller extends \lithium\core\Object {
 					$self->render(array('text' => $result));
 					return $self->response;
 				}
-				$self->set($result);
+				if (is_array($result)) {
+					$self->set($result);
+				}
 			}
 
 			if (!$render['hasRendered'] && $render['auto']) {

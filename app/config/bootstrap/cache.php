@@ -23,22 +23,27 @@ if (PHP_SAPI === 'cli') {
  * If APC is not available and the cache directory is not writeable, bail out. This block should be
  * removed post-install, and the cache should be configured with the adapter you plan to use.
  */
-if (!($apcEnabled = Apc::enabled()) && !is_writable(LITHIUM_APP_PATH . '/resources/tmp/cache')) {
+$cachePath = Libraries::get(true, 'resources') . '/tmp/cache';
+
+if (!($apcEnabled = Apc::enabled()) && !is_writable($cachePath)) {
 	return;
 }
 
+/**
+ * This configures the default cache, based on whether ot not APC user caching is enabled. If it is
+ * not, file caching will be used. Most of this code is for getting you up and running only, and
+ * should be replaced with a hard-coded configuration, based on the cache(s) you plan to use.
+ */
+$default = array('adapter' => 'File', 'strategies' => array('Serializer'));
+
 if ($apcEnabled) {
-	$default = array(
-		'adapter' => 'lithium\storage\cache\adapter\Apc',
-	);
-} else {
-	$default = array(
-		'adapter' => 'lithium\storage\cache\adapter\File',
-		'strategies' => array('Serializer')
-	);
+	$default = array('adapter' => 'Apc');
 }
 Cache::config(compact('default'));
 
+/**
+ * Caches paths for auto-loaded and service-located classes.
+ */
 Dispatcher::applyFilter('run', function($self, $params, $chain) {
 	$key = md5(LITHIUM_APP_PATH) . '.core.libraries';
 

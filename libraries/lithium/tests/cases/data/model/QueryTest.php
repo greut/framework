@@ -244,6 +244,7 @@ class QueryTest extends \lithium\test\Unit {
 	}
 
 	public function testExport() {
+		MockQueryPost::meta('source', 'foo');
 		$query = new Query($this->_queryArr);
 		$ds = new MockDatabase();
 		$export = $query->export($ds);
@@ -281,9 +282,8 @@ class QueryTest extends \lithium\test\Unit {
 		$result = $export['fields'];
 		$this->assertEqual($expected, $result);
 
-		$expected = MockQueryPost::meta('source');
 		$result = $export['source'];
-		$this->assertEqual("{{$expected}}", $result);
+		$this->assertEqual("{foo}", $result);
 	}
 
 	public function testRestrictedKeyExport() {
@@ -321,15 +321,24 @@ class QueryTest extends \lithium\test\Unit {
 		$query = new Query(array('joins' => array(array('foo' => 'bar'))));
 		$query->join(array('bar' => 'baz'));
 		$expected = array(array('foo' => 'bar'), array('bar' => 'baz'));
-		$this->assertEqual($expected, $query->join());
+		$joins = $query->join();
+
+		$this->assertEqual('bar', $joins[0]->foo());
+		$this->assertNull($joins[0]->bar());
+
+		$this->assertEqual('baz', $joins[1]->bar());
+		$this->assertNull($joins[1]->foo());
 
 		$query->join('zim', array('dib' => 'gir'));
+		$this->assertEqual(3, count($query->join()));
+
 		$expected = array(
 			array('foo' => 'bar'),
 			array('bar' => 'baz'),
 			'zim' => array('dib' => 'gir')
 		);
-		$this->assertEqual($expected, $query->join());
+		$this->assertEqual(3, count($query->join()));
+		$this->assertEqual('gir', $query->join('zim')->dib());
 	}
 
 	/**
@@ -407,6 +416,28 @@ class QueryTest extends \lithium\test\Unit {
 		$this->assertEqual($conditions, $query->conditions());
 		$this->assertEqual($fields, $query->fields());
 		$this->assertEqual($order, $query->order());
+	}
+
+	public function testRenderArrayJoin() {
+		$model = 'lithium\tests\mocks\data\model\MockQueryComment';
+
+		$query = new Query(compact('model') + array(
+			'type' => 'read',
+			'source' => 'comments',
+			'alias' => 'Comment',
+			'conditions' => array('Comment.id' => 1),
+			'joins' => array(array(
+				'type' => 'INNER',
+				'source' => 'posts',
+				'alias' => 'Post',
+				'constraint' => array('Comment.post_id' => 'Post.id')
+			))
+		));
+
+		$expected = "SELECT * FROM AS {Comment} INNER JOIN {posts} AS {Post} ON ";
+		$expected .= "{Comment}.{post_id} = {Post}.{id} WHERE Comment.id = 1;";
+		$result = Connections::get('mock-database-connection')->renderCommand($query);
+		$this->assertEqual($expected, $result);
 	}
 }
 

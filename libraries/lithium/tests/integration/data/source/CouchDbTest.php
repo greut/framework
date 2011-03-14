@@ -9,12 +9,7 @@
 namespace lithium\tests\integration\data\source;
 
 use lithium\data\Connections;
-
-class MockCouchModel extends \lithium\data\Model {
-	protected $_schema = array(
-		'someKey' => array()
-	);
-}
+use lithium\tests\mocks\MockCouchModel;
 
 class CouchDbTest extends \lithium\test\Integration {
 
@@ -98,7 +93,6 @@ class CouchDbTest extends \lithium\test\Integration {
 		$this->assertEqual($data['id'], $updated['id']);
 		$this->assertNotEqual($data['rev'], $updated['rev']);
 	}
-
 }
 
 ?>

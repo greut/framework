@@ -8,18 +8,32 @@
 
 namespace lithium\tests\cases\core;
 
-use \SplFileInfo;
+use stdClass;
+use SplFileInfo;
 use lithium\util\Inflector;
 use lithium\core\Libraries;
 
 class LibrariesTest extends \lithium\test\Unit {
 
+	protected $_cache = array();
+
+	public function setUp() {
+		$this->_cache = Libraries::cache();
+		Libraries::cache(false);
+	}
+
 	public function tearDown() {
 		Libraries::cache(false);
+		Libraries::cache($this->_cache);
 	}
 
 	public function testNamespaceToFileTranslation() {
 		$result = Libraries::path('\lithium\core\Libraries');
+		$this->assertTrue(strpos($result, '/lithium/core/Libraries.php'));
+		$this->assertTrue(file_exists($result));
+		$this->assertFalse(strpos($result, '\\'));
+
+		$result = Libraries::path('lithium\core\Libraries');
 		$this->assertTrue(strpos($result, '/lithium/core/Libraries.php'));
 		$this->assertTrue(file_exists($result));
 		$this->assertFalse(strpos($result, '\\'));
@@ -138,7 +152,7 @@ class LibrariesTest extends \lithium\test\Unit {
 	* @return void
 	*/
 	public function testAddInvalidLibrary() {
-		$this->expectException("Library 'invalid_foo' not found.");
+		$this->expectException("Library `invalid_foo` not found.");
 		Libraries::add('invalid_foo');
 	}
 
@@ -148,7 +162,7 @@ class LibrariesTest extends \lithium\test\Unit {
 	 * @return void
 	 */
 	public function testAddNonPrefixedLibrary() {
-		$tmpDir = realpath(LITHIUM_APP_PATH . '/resources/tmp');
+		$tmpDir = realpath(Libraries::get(true, 'resources') . '/tmp');
 		$this->skipIf(!is_writable($tmpDir), "Can't write to resources directory.");
 
 		$fakeDir = $tmpDir . '/fake';
@@ -215,7 +229,7 @@ class LibrariesTest extends \lithium\test\Unit {
 	 * @return void
 	 */
 	public function testLibraryLoad() {
-		$this->expectException('Failed to load SomeInvalidLibrary from ');
+		$this->expectException('Failed to load class `SomeInvalidLibrary` from path ``.');
 		Libraries::load('SomeInvalidLibrary', true);
 	}
 
@@ -325,7 +339,7 @@ class LibrariesTest extends \lithium\test\Unit {
 	public function testServiceLocateInstantiation() {
 		$result = Libraries::instance('adapter.template.view', 'Simple');
 		$this->assertTrue(is_a($result, 'lithium\template\view\adapter\Simple'));
-		$this->expectException("Class 'Foo' of type 'adapter.template.view' not found.");
+		$this->expectException("Class `Foo` of type `adapter.template.view` not found.");
 		$result = Libraries::instance('adapter.template.view', 'Foo');
 	}
 
@@ -368,7 +382,7 @@ class LibrariesTest extends \lithium\test\Unit {
 		$expected = '\lithium\data\source\Database';
 		$this->assertEqual($expected, $result);
 
-		$expected = new \stdClass();
+		$expected = new stdClass();
 		$result = Libraries::locate(null, $expected);
 		$this->assertEqual($expected, $result);
 	}
@@ -484,6 +498,7 @@ class LibrariesTest extends \lithium\test\Unit {
 			'lithium\console\command\G11n',
 			'lithium\console\command\Help',
 			'lithium\console\command\Library',
+			'lithium\console\command\Route',
 			'lithium\console\command\Test'
 		);
 		$result = Libraries::locate('command', null, array(
@@ -498,6 +513,7 @@ class LibrariesTest extends \lithium\test\Unit {
 			'lithium\console\command\G11n',
 			'lithium\console\command\Help',
 			'lithium\console\command\Library',
+			'lithium\console\command\Route',
 			'lithium\console\command\Test',
 			'lithium\console\command\g11n\Extract',
 			'lithium\console\command\create\Controller',
@@ -530,12 +546,12 @@ class LibrariesTest extends \lithium\test\Unit {
 	}
 
 	public function testLocateWithTestAppLibrary() {
-		$test_app = LITHIUM_APP_PATH . '/resources/tmp/tests/test_app';
-		mkdir($test_app);
-		Libraries::add('test_app', array('path' => $test_app));
+		$testApp = Libraries::get(true, 'resources') . '/tmp/tests/test_app';
+		mkdir($testApp);
+		Libraries::add('test_app', array('path' => $testApp));
 
-		mkdir($test_app . '/tests/cases/models', 0777, true);
-		file_put_contents($test_app . '/tests/cases/models/UserTest.php',
+		mkdir($testApp . '/tests/cases/models', 0777, true);
+		file_put_contents($testApp . '/tests/cases/models/UserTest.php',
 		"<?php namespace test_app\\tests\\cases\\models;\n
 			class UserTest extends \\lithium\\test\\Unit { public function testMe() {
 				\$this->assertTrue(true);
@@ -548,6 +564,20 @@ class LibrariesTest extends \lithium\test\Unit {
 	    $this->assertEqual($expected, $result);
 
 		$this->_cleanUp();
+	}
+
+	/**
+	 * Tests that `Libraries::realPath()` correctly resolves paths to files inside Phar archives.
+	 *
+	 * @return void
+	 */
+	public function testPathsInPharArchives() {
+		$base = Libraries::get('lithium', 'path');
+		$path = "{$base}/console/command/create/template/app.phar.gz";
+
+		$expected = "phar://{$path}/controllers/HelloWorldController.php";
+		$result = Libraries::realPath($expected);
+		$this->assertEqual($expected, $result);
 	}
 }
 

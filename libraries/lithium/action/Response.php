@@ -34,12 +34,15 @@ class Response extends \lithium\net\http\Response {
 		'media' => 'lithium\net\http\Media'
 	);
 
+	protected $_autoConfig = array('classes' => 'merge');
+
 	public function __construct(array $config = array()) {
 		$defaults = array('buffer' => 8192, 'location' => null, 'status' => 0, 'request' => null);
 		parent::__construct($config + $defaults);
 	}
 
 	protected function _init() {
+		parent::_init();
 		$config = $this->_config;
 		$this->status($config['status']);
 		unset($this->_config['status']);
@@ -49,7 +52,6 @@ class Response extends \lithium\net\http\Response {
 			$location = $classes['router']::match($config['location'], $config['request']);
 			$this->headers('location', $location);
 		}
-		parent::_init();
 	}
 
 	/**
@@ -59,7 +61,7 @@ class Response extends \lithium\net\http\Response {
 	 * @deprecated
 	 */
 	public function disableCache() {
-		$message = 'Request::disableCache() is deprecated. Please use Request::cache(false).';
+		$message = '`Request::disableCache()` is deprecated. Please use `Request::cache(false)`.';
 		throw new BadMethodCallException($message);
 	}
 
@@ -106,7 +108,7 @@ class Response extends \lithium\net\http\Response {
 			$code = 302;
 		}
 		if (!$status = $this->status($code)) {
-			throw new UnexpectedValueException('Invalid status code');
+			throw new UnexpectedValueException('Invalid status code.');
 		}
 		$this->_writeHeader($status);
 

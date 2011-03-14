@@ -17,7 +17,7 @@ class ServiceTest extends \lithium\test\Integration {
 			'classes' => array('socket' => '\lithium\net\socket\Stream')
 		));
 		$service->head();
-		
+
 		$expected = array('code' => 200, 'message' => 'OK');
 		$result = $service->last->response->status;
 		$this->assertEqual($expected, $result);
@@ -28,7 +28,7 @@ class ServiceTest extends \lithium\test\Integration {
 			'classes' => array('socket' => '\lithium\net\socket\Context')
 		));
 		$service->head();
-		
+
 		$expected = array('code' => 200, 'message' => 'OK');
 		$result = $service->last->response->status;
 		$this->assertEqual($expected, $result);
@@ -39,9 +39,11 @@ class ServiceTest extends \lithium\test\Integration {
 			'classes' => array('socket' => '\lithium\net\socket\Curl')
 		));
 		$service->head();
-		
+
 		$expected = array('code' => 200, 'message' => 'OK');
 		$result = $service->last->response->status;
 		$this->assertEqual($expected, $result);
 	}
 }
+
+?>

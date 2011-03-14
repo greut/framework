@@ -23,6 +23,7 @@ use lithium\data\entity\Document;
 use lithium\tests\mocks\data\MockPost;
 use lithium\data\collection\DocumentSet;
 use lithium\data\collection\DocumentArray;
+use lithium\tests\mocks\data\source\MockMongoSource;
 use lithium\tests\mocks\data\source\MockMongoConnection;
 
 class MongoDbTest extends \lithium\test\Unit {
@@ -241,37 +242,50 @@ class MongoDbTest extends \lithium\test\Unit {
 	}
 
 	public function testReadNoConditions() {
-		$data = array('title' => 'Test Post');
-		$this->query->data($data);
-		$this->db->create($this->query);
+		$this->db->connect();
+		$connection = $this->db->connection;
+		$this->db->connection = new MockMongoSource();
+		$this->db->connection->resultSets = array(array('ok' => true));
 
+		$data = array('title' => 'Test Post');
+		$options = array('safe' => false, 'fsync' => false);
+		$this->query->data($data);
+		$this->assertIdentical(true, $this->db->create($this->query));
+		$this->assertEqual(compact('data', 'options'), end($this->db->connection->queries));
+
+		$this->db->connection->resultSets = array(array(array('_id' => new MongoId()) + $data));
 		$result = $this->db->read($this->query);
+
 		$this->assertTrue($result instanceof DocumentSet);
 		$this->assertEqual(1, $result->count());
-
-		$expected = $data['title'];
-		$this->assertEqual($expected, $result->first()->title);
+		$this->assertEqual('Test Post', $result->first()->title);
+		$this->db->connection = $connection;
 	}
 
 	public function testReadWithConditions() {
+		$this->db->connect();
+		$connection = $this->db->connection;
+		$this->db->connection = new MockMongoSource();
+		$this->db->connection->resultSets = array(array('ok' => true));
+
 		$data = array('title' => 'Test Post');
+		$options = array('safe' => false, 'fsync' => false);
 		$this->query->data($data);
-		$this->db->create($this->query);
+		$this->assertTrue($this->db->create($this->query));
 		$this->query->data(null);
 
+		$this->db->connection->resultSets = array(array());
 		$this->query->conditions(array('title' => 'Nonexistent Post'));
 		$result = $this->db->read($this->query);
 		$this->assertTrue($result == true);
+		$this->assertEqual(0, $result->count());
 
-		$expected = 0;
-		$this->assertEqual($expected, $result->count());
-
+		$this->db->connection->resultSets = array(array($data));
 		$this->query->conditions($data);
 		$result = $this->db->read($this->query);
 		$this->assertTrue($result == true);
-
-		$expected = 1;
-		$this->assertEqual($expected, $result->count());
+		$this->assertEqual(1, $result->count());
+		$this->db->connection = $connection;
 	}
 
 	public function testUpdate() {
@@ -299,7 +313,8 @@ class MongoDbTest extends \lithium\test\Unit {
 		)));
 		$this->assertEqual(1, $result->count());
 
-		$updated = $result->first()->to('array');
+		$updated = $result->first();
+		$updated = $updated ? $updated->to('array') : array();
 		$this->assertEqual($original['_id'], $updated['_id']);
 		$this->assertEqual('New Post Title', $updated['title']);
 	}
@@ -443,23 +458,24 @@ class MongoDbTest extends \lithium\test\Unit {
 	}
 
 	public function testRelationshipGeneration() {
-		$this->skipIf(true, "Temporarily disabled.");
 		Connections::add('mock-source', $this->_testConfig);
 		$from = 'lithium\tests\mocks\data\MockComment';
 		$to = 'lithium\tests\mocks\data\MockPost';
 
 		$from::config(array('connection' => 'mock-source'));
-		$to::config(array('connection' => 'mock-source'));
+		$to::config(array('connection' => 'mock-source', 'key' => '_id'));
 
 		$result = $this->db->relationship($from, 'belongsTo', 'MockPost');
-		$expected = compact('from', 'to') + array(
+		$expected = array(
 			'name' => 'MockPost',
 			'type' => 'belongsTo',
 			'keys' => array('mockComment' => '_id'),
+			'from' => $from,
 			'link' => 'contained',
-			'conditions' => null,
+			'to'   => $to,
 			'fields' => true,
 			'fieldName' => 'mockPost',
+			'constraint' => null,
 			'init' => true
 		);
 		$this->assertEqual($expected, $result->data());
@@ -505,7 +521,7 @@ class MongoDbTest extends \lithium\test\Unit {
 
 		$duplicate = $model::create(array('_id' => $document->_id), array('exists' => true));
 		$duplicate->values = 'new';
-		$duplicate->save();
+		$this->assertTrue($duplicate->save());
 
 		$document = $model::find((string) $duplicate->_id);
 		$expected = array(
@@ -545,7 +561,7 @@ class MongoDbTest extends \lithium\test\Unit {
 		$result = $this->db->conditions($conditions, $query);
 
 		$this->assertEqual(array_keys($conditions), array_keys($result));
-		$this->assertTrue($result['_id'] instanceOf MongoId);
+		$this->assertTrue($result['_id'] instanceof MongoId);
 		$this->assertEqual($conditions['_id'], (string) $result['_id']);
 
 		$conditions = array('_id' => array(
@@ -553,9 +569,9 @@ class MongoDbTest extends \lithium\test\Unit {
 		));
 		$result = $this->db->conditions($conditions, $query);
 		$this->assertEqual(3, count($result['_id']['$in']));
-		$this->assertTrue($result['_id']['$in'][0] instanceOf MongoId);
-		$this->assertTrue($result['_id']['$in'][1] instanceOf MongoId);
-		$this->assertTrue($result['_id']['$in'][2] instanceOf MongoId);
+		$this->assertTrue($result['_id']['$in'][0] instanceof MongoId);
+		$this->assertTrue($result['_id']['$in'][1] instanceof MongoId);
+		$this->assertTrue($result['_id']['$in'][2] instanceof MongoId);
 
 		$conditions = array('voters' => array('$all' => array(
 			"4c8f86167675abfabdbf0300", "4c8f86167675abfabdc00300"
@@ -563,8 +579,8 @@ class MongoDbTest extends \lithium\test\Unit {
 		$result = $this->db->conditions($conditions, $query);
 
 		$this->assertEqual(2, count($result['voters']['$all']));
-		$this->assertTrue($result['voters']['$all'][0] instanceOf MongoId);
-		$this->assertTrue($result['voters']['$all'][1] instanceOf MongoId);
+		$this->assertTrue($result['voters']['$all'][0] instanceof MongoId);
+		$this->assertTrue($result['voters']['$all'][1] instanceof MongoId);
 
 		$conditions = array('$or' => array(
 			array('_id' => "4c8f86167675abfabdbf0300"),
@@ -573,8 +589,8 @@ class MongoDbTest extends \lithium\test\Unit {
 		$result = $this->db->conditions($conditions, $query);
 		$this->assertEqual(array('$or'), array_keys($result));
 		$this->assertEqual(2, count($result['$or']));
-		$this->assertTrue($result['$or'][0]['_id'] instanceOf MongoId);
-		$this->assertTrue($result['$or'][1]['guid'] instanceOf MongoId);
+		$this->assertTrue($result['$or'][0]['_id'] instanceof MongoId);
+		$this->assertTrue($result['$or'][1]['guid'] instanceof MongoId);
 	}
 
 	public function testMultiOperationConditions() {

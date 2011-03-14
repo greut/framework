@@ -11,7 +11,6 @@ namespace lithium\console\command;
 use lithium\core\Libraries;
 use lithium\test\Group;
 use lithium\test\Dispatcher;
-use lithium\analysis\Inspector;
 
 /**
  * Runs a given set of tests and outputs the results.
@@ -68,7 +67,8 @@ class Test extends \lithium\console\Command {
 	 * lithium test --group=lithium.tests.cases.core
 	 * }}}
 	 *
-	 * @return void
+	 * @param string $path Absolute or relative path to tests.
+	 * @return boolean Will exit with status `1` if one or more tests failed otherwise with `0`.
 	 */
 	public function run() {
 		$this->header('Test');
@@ -87,9 +87,11 @@ class Test extends \lithium\console\Command {
 			'reporter' => 'console',
 			'format' => 'txt'
 		));
+		$stats = $report->stats();
+
 		$this->out('done.', 2);
 		$this->out('{:heading1}Results{:end}', 0);
-		$this->out($report->render('stats'));
+		$this->out($report->render('stats', $stats));
 
 		foreach ($report->filters() as $filter => $options) {
 			$data = $report->results['filters'][$filter];
@@ -99,8 +101,7 @@ class Test extends \lithium\console\Command {
 		$this->hr();
 		$this->nl();
 
-		$stats = $report->stats();
-		return $stats['success'] ? 0 : 1;
+		return $stats['success'];
 	}
 
 	/**
@@ -113,7 +114,7 @@ class Test extends \lithium\console\Command {
 
 		$classes = Libraries::find(true, array(
 			'recursive' => true,
-			'exclude' => '/\w+Test$|webroot|index$|^app\\\\config|^app\\\\views/'
+			'exclude' => '/tests|resources|webroot|index$|^app\\\\config|^app\\\\views/'
 		));
 		$tests = Group::all();
 		$classes = array_diff($classes, $tests);

@@ -26,7 +26,7 @@ use BadMethodCallException;
  * data mutation (saving/updating/deleting). All query-related operations may be done through the
  * static `find()` method, along with some additional utility methods provided for convenience.
  *
- * Classes extending this one should, conventionally, be named as Singular, CamelCase and be
+ * Classes extending this one should, conventionally, be named as Plural, CamelCase and be
  * placed in the `app/models` directory. i.e. a posts model would be `app/model/Posts.php`.
  *
  * Examples:
@@ -170,10 +170,9 @@ class Model extends \lithium\core\StaticObject {
 	 */
 	protected $_relationTypes = array(
 		'belongsTo' => array('class', 'key', 'conditions', 'fields'),
-		'hasOne'    => array('class', 'key', 'conditions', 'fields', 'dependent'),
+		'hasOne'    => array('class', 'key', 'conditions', 'fields'),
 		'hasMany'   => array(
-			'class', 'key', 'conditions', 'fields', 'order', 'limit',
-			'dependent', 'exclusive', 'finder', 'counter'
+			'class', 'key', 'conditions', 'fields', 'order', 'limit'
 		)
 	);
 
@@ -321,9 +320,7 @@ class Model extends \lithium\core\StaticObject {
 		if (static::_isBase($class = get_called_class())) {
 			return;
 		}
-		$self = static::_object();
-		$base = get_class_vars(__CLASS__);
-
+		$self    = static::_object();
 		$meta    = array();
 		$schema  = array();
 		$source  = array();
@@ -342,16 +339,16 @@ class Model extends \lithium\core\StaticObject {
 			}
 		}
 		$tmp = $options + $self->_meta + $meta;
+		$source = array('meta' => array(), 'finders' => array(), 'schema' => array());
 
 		if ($tmp['connection']) {
 			$conn = $classes['connections']::get($tmp['connection']);
-			$source = ($conn) ? $conn->configureClass($class) : array();
+			$source = (($conn) ? $conn->configureClass($class) : array()) + $source;
 		}
-		$source += array('meta' => array(), 'finders' => array(), 'schema' => array());
 		static::$_classes = $classes;
 		$name = static::_name();
 
-		$local = compact('class', 'name') + $options + array_diff($self->_meta, $base['_meta']);
+		$local = compact('class', 'name') + $options + $self->_meta;
 		$self->_meta = ($local + $source['meta'] + $meta);
 		$self->_meta['initialized'] = false;
 		$self->_schema += $schema + $source['schema'];
@@ -389,7 +386,7 @@ class Model extends \lithium\core\StaticObject {
 		preg_match('/^findBy(?P<field>\w+)$|^find(?P<type>\w+)By(?P<fields>\w+)$/', $method, $args);
 
 		if (!$args) {
-			$message = "Method %s not defined or handled in class %s";
+			$message = "Method `%s` not defined or handled in class `%s`.";
 			throw new BadMethodCallException(sprintf($message, $method, get_class($self)));
 		}
 		$field = Inflector::underscore($args['field'] ? $args['field'] : $args['fields']);
@@ -445,7 +442,7 @@ class Model extends \lithium\core\StaticObject {
 			$type = 'first';
 		}
 
-		$options += ((array) $self->_query + (array) $defaults);
+		$options = (array) $options + (array) $self->_query + (array) $defaults;
 		$meta = array('meta' => $self->_meta, 'name' => get_called_class());
 		$params = compact('type', 'options');
 
@@ -572,7 +569,7 @@ class Model extends \lithium\core\StaticObject {
 		$self = static::_object();
 
 		if (!isset($self->_relationTypes[$type])) {
-			throw new ConfigException("Invalid relationship type '{$type}' specified.");
+			throw new ConfigException("Invalid relationship type `{$type}` specified.");
 		}
 		$rel = static::connection()->relationship(get_called_class(), $type, $name, $config);
 		return static::_object()->_relations[$name] = $rel;
@@ -770,18 +767,52 @@ class Model extends \lithium\core\StaticObject {
 		};
 
 		if (!$options['callbacks']) {
-			return $filter($entity, $options);
+			return $filter($entity, $params);
 		}
 		return static::_filter(__FUNCTION__, $params, $filter);
 	}
 
 	/**
-	 * Indicates whether the `Model`'s current data validates, given the
-	 * current rules setup.
+	 * An important part of describing the business logic of a model class is defining the
+	 * validation rules. In Lithium models, rules are defined through the `$validates` class
+	 * property, and are used by this method before saving to verify the correctness of the data
+	 * being sent to the backend data source.
 	 *
-	 * @param string $entity Model record to validate.
-	 * @param array $options Options.
-	 * @return boolean Success.
+	 * Note that these are application-level validation rules, and do not
+	 * interact with any rules or constraints defined in your data source. If such constraints fail,
+	 * an exception will be thrown by the database layer. The `validates()` method only checks
+	 * against the rules defined in application code.
+	 *
+	 * This method uses the `Validator` class to perform data validation. An array representation of
+	 * the entity object to be tested is passed to the `check()` method, along with the model's
+	 * validation rules. Any rules defined in the `Validator` class can be used to validate fields.
+	 * See the `Validator` class to add custom rules, or override built-in rules.
+	 *
+	 * @see lithium\data\Model::$validates
+	 * @see lithium\util\Validator::check()
+	 * @see lithium\data\Entity::errors()
+	 * @param string $entity Model entity to validate. Typically either a `Record` or `Document`
+	 *               object. In the following example:
+	 * {{{
+	 * $post = Posts::create($data);
+	 * $success = $post->validates();
+	 * }}}
+	 * The `$entity` parameter is equal to the `$post` object instance.
+	 * @param array $options Available options:
+	 *              - `'rules'` _array_: If specified, this array will _replace_ the default
+	 *                validation rules defined in `$validates`.
+	 *              - `'events'` _mixed_: A string or array defining one or more validation
+	 *                 _events_. Events are different contexts in which data events can occur, and
+	 *                correspond to the optional `'on'` key in validation rules. For example, by
+	 *                default, `'events'` is set to either `'create'` or `'update'`, depending on
+	 *                whether `$entity` already exists. Then, individual rules can specify
+	 *                `'on' => 'create'` or `'on' => 'update'` to only be applied at certain times.
+	 *                Using this parameter, you can set up custom events in your rules as well, such
+	 *                as `'on' => 'login'`. Note that when defining validation rules, the `'on'` key
+	 *                can also be an array of multiple events.
+	 * @return boolean Returns `true` if all validation rules on all fields succeed, otherwise
+	 *         `false`. After validation, the messages for any validation failures are assigned to
+	 *         the entity, and accessible through the `errors()` method of the entity object.
 	 */
 	public function validates($entity, array $options = array()) {
 		$defaults = array(
@@ -895,7 +926,7 @@ class Model extends \lithium\core\StaticObject {
 		if ($conn = $connections::get($name)) {
 			return $conn;
 		}
-		throw new ConfigException("The data connection {$name} is not configured");
+		throw new ConfigException("The data connection `{$name}` is not configured.");
 	}
 
 	/**

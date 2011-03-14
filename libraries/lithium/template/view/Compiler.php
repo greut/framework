@@ -8,6 +8,7 @@
 
 namespace lithium\template\view;
 
+use lithium\core\Libraries;
 use lithium\template\TemplateException;
 
 /**
@@ -51,7 +52,7 @@ class Compiler extends \lithium\core\StaticObject {
 	 * @return string The compiled template.
 	 */
 	public static function template($file, array $options = array()) {
-		$cachePath = LITHIUM_APP_PATH . '/resources/tmp/cache/templates';
+		$cachePath = Libraries::get(true, 'resources') . '/tmp/cache/templates';
 		$defaults = array('path' => $cachePath, 'fallback' => true);
 		$options += $defaults;
 
@@ -77,7 +78,7 @@ class Compiler extends \lithium\core\StaticObject {
 		if ($options['fallback']) {
 			return $file;
 		}
-		throw new TemplateException("Could not write compiled template {$template} to cache");
+		throw new TemplateException("Could not write compiled template `{$template}` to cache.");
 	}
 
 	/**

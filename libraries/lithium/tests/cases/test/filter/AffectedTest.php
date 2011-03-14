@@ -77,6 +77,23 @@ class AffectedTest extends \lithium\test\Unit {
 		$result = $tests->map('get_class', array('collect' => false));
 		$this->assertEqual($expected, $result);
 	}
+
+	public function testAnalyze() {
+		$ns = 'lithium\tests\cases';
+
+		$expected = array(
+			'lithium\g11n\Message' => "{$ns}\g11n\MessageTest",
+			'lithium\console\command\g11n\Extract' => "{$ns}\console\command\g11n\ExtractTest"
+		);
+
+		$group = new Group();
+		$group->add('lithium\tests\cases\g11n\CatalogTest');
+		$this->report->group = $group;
+		$tests = Affected::apply($this->report, $group->tests());
+		$results = Affected::analyze($this->report);
+
+		$this->assertEqual($results, $expected);
+	}
 }
 
 ?>

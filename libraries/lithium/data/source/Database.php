@@ -43,7 +43,7 @@ abstract class Database extends \lithium\data\Source {
 		'update' => "UPDATE {:source} SET {:fields} {:conditions};{:comment}",
 		'delete' => "DELETE {:flags} FROM {:source} {:alias} {:conditions};{:comment}",
 		'schema' => "CREATE TABLE {:source} (\n{:columns}{:indexes});{:comment}",
-		'join'   => "{:type} JOIN {:source} {:alias} {:constraint} {:conditions}"
+		'join'   => "{:type} JOIN {:source} {:alias} {:constraint}"
 	);
 
 	/**
@@ -273,8 +273,8 @@ abstract class Database extends \lithium\data\Source {
 
 					while ($data = $result->next()) {
 						// @hack: Fix this to support relationships
-						if ((count($columns) != count($data) && isset($columns[0])) || is_array($columns[0])) {
-							$columns = $columns[0];
+						if (count($columns) != count($data) && is_array(current($columns))) {
+							$columns = current($columns);
 						}
 						$records[] = array_combine($columns, $data);
 					}
@@ -390,7 +390,7 @@ abstract class Database extends \lithium\data\Source {
 			$type = $context->type();
 		}
 		if (!isset($this->_strings[$type])) {
-			throw new InvalidArgumentException("Invalid query type '{$type}'");
+			throw new InvalidArgumentException("Invalid query type `{$type}`.");
 		}
 		$data = array_filter($data);
 		return trim(String::insert($this->_strings[$type], $data, array('clean' => true)));

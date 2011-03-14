@@ -349,7 +349,7 @@ class DocumentTest extends \lithium\test\Unit {
 	public function testInvalidCall() {
 		$doc = new Document();
 
-		$this->expectException("No model bound or unhandled method call 'medicin'.");
+		$this->expectException("No model bound or unhandled method call `medicin`.");
 		$result = $doc->medicin();
 		$this->assertNull($result);
 	}
@@ -439,9 +439,8 @@ class DocumentTest extends \lithium\test\Unit {
 		$result = $doc->data('title');
 		$this->assertEqual($expected, $result);
 
-		$expected = false;
 		$result = $doc->data('permanent');
-		$this->assertEqual($expected, $result);
+		$this->assertFalse($result);
 
 		$doc = new Document();
 		$this->assertNull($doc->data('field'));
@@ -601,6 +600,7 @@ class DocumentTest extends \lithium\test\Unit {
 		$doc->more = 'cowbell';
 		$doc->nested->evenMore = 'cowbell';
 		$modified = $doc->export();
+
 		$expected = array('more' => 'cowbell');
 		$this->assertEqual($expected, $modified['update']);
 		$this->assertEqual(array('nested', 'foo', 'baz'), array_keys($modified['data']));
@@ -630,6 +630,29 @@ class DocumentTest extends \lithium\test\Unit {
 		$result = $doc->data();
 		$this->assertPattern('/^[a-f0-9]{24}$/', $result['id']);
 		$this->assertEqual(time(), $result['date']);
+	}
+
+	public function testInitializationWithNestedFields() {
+		$doc = new Document(array('model' => $this->_model, 'data' => array(
+			'simple' => 'value',
+			'nested.foo' => 'first',
+			'nested.bar' => 'second',
+			'really.nested.key' => 'value'
+		)));
+		$this->assertEqual('value', $doc->simple);
+		$this->assertEqual('first', $doc->nested->foo);
+		$this->assertEqual('second', $doc->nested->bar);
+		$this->assertEqual('value', $doc->really->nested->key);
+		$this->assertEqual(array('simple', 'nested', 'really'), array_keys($doc->data()));
+	}
+
+	public function testIdGetDoesNotSet() {
+		$document = MockDocumentPost::create();
+		$message = 'The `_id` key should not be set.';
+		$this->assertFalse(array_key_exists('_id', $document->data()), $message);
+
+		$document->_id == "";
+		$this->assertFalse(array_key_exists('_id', $document->data()), $message);
 	}
 }
 

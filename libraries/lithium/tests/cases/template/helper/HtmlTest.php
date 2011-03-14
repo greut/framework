@@ -10,6 +10,8 @@ namespace lithium\tests\cases\template\helper;
 
 use lithium\net\http\Router;
 use lithium\template\helper\Html;
+use lithium\action\Request;
+use lithium\action\Response;
 use lithium\tests\mocks\template\helper\MockHtmlRenderer;
 
 class HtmlTest extends \lithium\test\Unit {
@@ -34,7 +36,12 @@ class HtmlTest extends \lithium\test\Unit {
 		Router::connect('/{:controller}/{:action}/{:id}.{:type}');
 		Router::connect('/{:controller}/{:action}.{:type}');
 
-		$this->context = new MockHtmlRenderer();
+		$this->context = new MockHtmlRenderer(array(
+			'request' => new Request(array(
+				'base' => '', 'env' => array('HTTP_HOST' => 'foo.local')
+			)),
+			'response' => new Response()
+		));
 		$this->html = new Html(array('context' => &$this->context));
 	}
 
@@ -53,21 +60,25 @@ class HtmlTest extends \lithium\test\Unit {
 	}
 
 	/**
-	 * Tests that character set declarations render the correct character set and meta tag.
+	 * Tests that character set declarations render the
+	 * correct character set and short meta tag.
 	 *
 	 * @return void
 	 */
 	public function testCharset() {
 		$result = $this->html->charset();
-
 		$this->assertTags($result, array('meta' => array(
-			'http-equiv' => 'Content-Type', 'content' => 'text/html; charset=utf-8'
+			'charset' => 'UTF-8'
+		)));
+
+		$result = $this->html->charset('utf-8');
+		$this->assertTags($result, array('meta' => array(
+			'charset' => 'utf-8'
 		)));
 
 		$result = $this->html->charset('UTF-7');
-
 		$this->assertTags($result, array('meta' => array(
-			'http-equiv' => 'Content-Type', 'content' => 'text/html; charset=UTF-7'
+			'charset' => 'UTF-7'
 		)));
 	}
 
@@ -350,7 +361,9 @@ class HtmlTest extends \lithium\test\Unit {
 		$expected = array('meta' => array('author' => 'foo'));
 		$this->assertTags($result, $expected);
 
-		$result = $this->html->head('unexisting-name', array('options' => array('author' => 'foo')));
+		$result = $this->html->head('unexisting-name', array(
+			'options' => array('author' => 'foo')
+		));
 		$this->assertNull($result);
 	}
 

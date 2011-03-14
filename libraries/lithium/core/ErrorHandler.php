@@ -9,8 +9,8 @@
 namespace lithium\core;
 
 use Exception;
-use lithium\util\Collection;
-use lithium\core\Environment;
+use ErrorException;
+use lithium\util\collection\Filters;
 
 /**
  * The `ErrorHandler` class allows PHP errors and exceptions to be handled in a uniform way. Using
@@ -61,6 +61,8 @@ class ErrorHandler extends \lithium\core\StaticObject {
 	 */
 	protected static $_isRunning = false;
 
+	protected static $_runOptions = array();
+
 	/**
 	 * Setup basic error handling checks/types, as well as register the error and exception
 	 * hanlders.
@@ -72,21 +74,15 @@ class ErrorHandler extends \lithium\core\StaticObject {
 	public static function __init() {
 		static::$_checks = array(
 			'type'  => function($config, $info) {
-				return (
-					$config['type'] == $info['type'] ||
-					is_subclass_of($info['type'], $config['type'])
-				);
+				return (boolean) array_filter((array) $config['type'], function($type) use ($info) {
+					return $type == $info['type'] || is_subclass_of($info['type'], $type);
+				});
 			},
 			'code' => function($config, $info) {
 				return ($config['code'] & $info['code']);
 			},
 			'stack' => function($config, $info) {
-				foreach ((array) $config['stack'] as $frame) {
-					if (in_array($frame, $info['stack'])) {
-						return true;
-					}
-				}
-				return false;
+				return (boolean) array_intersect((array) $config['stack'], $info['stack']);
 			},
 			'message' => function($config, $info) {
 				return preg_match($config['message'], $info['message']);
@@ -95,16 +91,15 @@ class ErrorHandler extends \lithium\core\StaticObject {
 		$self = get_called_class();
 
 		static::$_exceptionHandler = function($exception, $return = false) use ($self) {
-			$info = array('type' => get_class($exception)) + compact('exception');
-
+			$info = compact('exception') + array(
+				'type' => get_class($exception),
+				'stack' => $self::trace($exception->getTrace())
+			);
 			foreach (array('message', 'file', 'line', 'trace') as $key) {
 				$method = 'get' . ucfirst($key);
 				$info[$key] = $exception->{$method}();
 			}
-			if ($return) {
-				return $info;
-			}
-			$self::invokeMethod('handle', array($info));
+			return $return ? $info : $self::handle($info);
 		};
 	}
 
@@ -122,7 +117,7 @@ class ErrorHandler extends \lithium\core\StaticObject {
 	/**
 	 * Configure the `ErrorHandler`.
 	 *
-	 * @var array $config Configuration directives.
+	 * @param array $config Configuration directives.
 	 * @return Current configuration set.
 	 */
 	public static function config($config = array()) {
@@ -139,20 +134,44 @@ class ErrorHandler extends \lithium\core\StaticObject {
 	 * This method (`ErrorHandler::run()`) needs to be called as early as possible in the bootstrap
 	 * cycle; immediately after `require`-ing `bootstrap/libraries.php` is your best bet.
 	 *
+	 * @param array $config The configuration with which to start the error handler. Available
+	 *              options include:
+	 *              - `'trapErrors'` _boolean_: Defaults to `false`. If set to `true`, PHP errors
+	 *                will be caught by `ErrorHandler` and handled in-place. Execution will resume
+	 *                in the same context in which the error occurred.
+	 *              - `'convertErrors'` _boolean_: Defaults to `true`, and specifies that all PHP
+	 *                errors should be converted to `ErrorException`s and thrown from the point
+	 *                where the error occurred. The exception will be caught at the first point in
+	 *                the stack trace inside a matching `try`/`catch` block, or that has a matching
+	 *                error handler applied using the `apply()` method.
 	 * @return void
 	 */
-	public static function run() {
+	public static function run(array $config = array()) {
+		$defaults = array('trapErrors' => false, 'convertErrors' => true);
+
+		if (static::$_isRunning) {
+			return;
+		}
+		static::$_isRunning = true;
+		static::$_runOptions = $config + $defaults;
 		$self = get_called_class();
 
-		set_error_handler(function($code, $message, $file, $line = 0, $context = null) use ($self) {
+		$trap = function($code, $message, $file, $line = 0, $context = null) use ($self) {
 			$trace = debug_backtrace();
 			$trace = array_slice($trace, 1, count($trace));
-			$self::invokeMethod('handle', array(
-				compact('type', 'code', 'message', 'file', 'line', 'trace', 'context')
-			));
-		});
+			$self::handle(compact('type', 'code', 'message', 'file', 'line', 'trace', 'context'));
+		};
+
+		$convert = function($code, $message, $file, $line = 0, $context = null) use ($self) {
+			throw new ErrorException($message, 500, $code, $file, $line);
+		};
+
+		if (static::$_runOptions['trapErrors']) {
+			set_error_handler($trap);
+		} elseif (static::$_runOptions['convertErrors']) {
+			set_error_handler($convert);
+		}
 		set_exception_handler(static::$_exceptionHandler);
-		static::$_isRunning = true;
 	}
 
 	/**
@@ -212,7 +231,7 @@ class ErrorHandler extends \lithium\core\StaticObject {
 		);
 		$info = (array) $info + $defaults;
 
-		$info['stack'] = static::_trace($info['trace']);
+		$info['stack'] = static::trace($info['trace']);
 		$info['origin'] = static::_origin($info['trace']);
 
 		foreach ($rules as $config) {
@@ -245,7 +264,7 @@ class ErrorHandler extends \lithium\core\StaticObject {
 	/**
 	 * Determine frame from the stack trace where the error/exception was first generated.
 	 *
-	 * @var array $stack Stack trace from error/exception that was produced.
+	 * @param array $stack Stack trace from error/exception that was produced.
 	 * @return string Class where error/exception was generated.
 	 */
 	protected static function _origin(array $stack) {
@@ -256,22 +275,25 @@ class ErrorHandler extends \lithium\core\StaticObject {
 		}
 	}
 
-	public static function apply($class, $method, array $conditions, $handler) {
+	public static function apply($object, array $conditions, $handler) {
+		$conditions = $conditions ?: array('type' => 'Exception');
+		list($class, $method) = is_string($object) ? explode('::', $object) : $object;
+		$wrap = static::$_exceptionHandler;
 		$_self = get_called_class();
 
-		$filter = function($self, $params, $chain) use ($_self, $conditions, $handler) {
+		$filter = function($self, $params, $chain) use ($_self, $conditions, $handler, $wrap) {
 			try {
 				return $chain->next($self, $params, $chain);
 			} catch (Exception $e) {
 				if (!$_self::matches($e, $conditions)) {
 					throw $e;
 				}
-				return $handler($e, $params);
+				return $handler($wrap($e, true), $params);
 			}
 		};
 
 		if (is_string($class)) {
-			$class::applyFilter($method, $filter);
+			Filters::apply($class, $method, $filter);
 		} else {
 			$class->applyFilter($method, $filter);
 		}
@@ -302,10 +324,10 @@ class ErrorHandler extends \lithium\core\StaticObject {
 	/**
 	 * Trim down a typical stack trace to class & method calls.
 	 *
-	 * @var array $stack A `debug_backtrace()`-compatible stack trace output.
+	 * @param array $stack A `debug_backtrace()`-compatible stack trace output.
 	 * @return array Returns a flat stack array containing class and method references.
 	 */
-	protected static function _trace(array $stack) {
+	public static function trace(array $stack) {
 		$result = array();
 
 		foreach ($stack as $frame) {

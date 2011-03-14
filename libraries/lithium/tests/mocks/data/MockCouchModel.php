@@ -8,16 +8,11 @@
 
 namespace lithium\tests\mocks\data;
 
-class Employee extends \lithium\data\Model {
+class MockCouchModel extends \lithium\data\Model {
 
-	public $belongsTo = array('Companies');
-
-	protected $_meta = array('connection' => 'test');
-
-	public function lastName($entity) {
-		$name = explode(' ', $entity->name);
-		return $name[1];
-	}
+	protected $_schema = array(
+		'someKey' => array()
+	);
 }
 
 ?>

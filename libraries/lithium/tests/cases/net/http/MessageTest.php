@@ -29,9 +29,8 @@ class MessageTest extends \lithium\test\Unit {
 		$result = $this->message->headers('Host');
 		$this->assertEqual($expected, $result);
 
-		$expected = null;
 		$result = $this->message->headers('Host', false);
-		$this->assertEqual($expected, $result);
+		$this->assertFalse($result);
 	}
 
 	public function testHeaderKeyValue() {

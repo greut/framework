@@ -238,13 +238,11 @@ class MediaTest extends \lithium\test\Unit {
 		$data = array('something');
 		Media::render($response, $data);
 
-		$expected = array('Content-type: application/json');
 		$result = $response->headers();
-		$this->assertEqual($expected, $result);
+		$this->assertEqual(array('Content-type: application/json; charset=UTF-8'), $result);
 
-		$expected = json_encode($data);
 		$result = $response->body();
-		$this->assertEqual($expected, $result);
+		$this->assertEqual(json_encode($data), $result);
 	}
 
 	/**
@@ -290,8 +288,7 @@ class MediaTest extends \lithium\test\Unit {
 		$this->assertEqual(array($expected), $result);
 
 		$result = $response->headers['Content-type'];
-		$expected = 'application/csv';
-		$this->assertEqual($expected, $result);
+		$this->assertEqual('application/csv; charset=UTF-8', $result);
 	}
 
 	/**
@@ -304,9 +301,8 @@ class MediaTest extends \lithium\test\Unit {
 		$response->type('text');
 		Media::render($response, "Hello, world!");
 
-		$expected = array("Hello, world!");
 		$result = $response->body;
-		$this->assertEqual($expected, $result);
+		$this->assertEqual(array("Hello, world!"), $result);
 	}
 
 	/**
@@ -319,7 +315,7 @@ class MediaTest extends \lithium\test\Unit {
 		$response = new Response();
 		$response->type('bad');
 
-		$this->expectException("Unhandled media type 'bad'");
+		$this->expectException("Unhandled media type `bad`.");
 		Media::render($response, array('foo' => 'bar'));
 
 		$result = $response->body;
@@ -336,7 +332,7 @@ class MediaTest extends \lithium\test\Unit {
 		$response = new Response();
 		$response->type('xml');
 
-		$this->expectException("Unhandled media type 'xml'");
+		$this->expectException("Unhandled media type `xml`.");
 		Media::render($response, array('foo' => 'bar'));
 
 		$result = $response->body;
@@ -408,7 +404,7 @@ class MediaTest extends \lithium\test\Unit {
 	}
 
 	public function testRenderWithOptionsMerging() {
-		$base = LITHIUM_APP_PATH . '/resources/tmp';
+		$base = Libraries::get(true, 'resources') . '/tmp';
 		$this->skipIf(!is_writable($base), "{$base} is not writable.");
 
 		$request = new Request();

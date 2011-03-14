@@ -99,83 +99,57 @@ class RequestTest extends \lithium\test\Unit {
 	}
 
 	public function testScriptName() {
-		$_SERVER['SCRIPT_NAME'] = 'index.php';
-		$request = new Request();
-
-		$expected = 'index.php';
-		$result = $request->env('SCRIPT_NAME');
-		$this->assertEqual($expected, $result);
+		$request = new Request(array(
+			'env' => array('HTTPS' => true, 'SCRIPT_NAME' => 'index.php')
+		));
+		$this->assertEqual('index.php', $request->env('SCRIPT_NAME'));
 	}
 
 	public function testHttps() {
-		$_SERVER['HTTPS'] = true;
-		$request = new Request();
-
-		$expected = true;
-		$result = $request->env('HTTPS');
-		$this->assertEqual($expected, $result);
+		$request = new Request(array('env' => array('HTTPS' => true)));
+		$this->assertTrue($request->env('HTTPS'));
 	}
 
 	public function testHttpsFromScriptUri() {
-		$_SERVER['SCRIPT_URI'] = 'https://lithium.com';
-		unset($_SERVER['HTTPS']);
-		$request = new Request();
-
-		$expected = true;
-		$result = $request->env('HTTPS');
-		$this->assertEqual($expected, $result);
+		$request = new Request(array('env' => array(
+			'SCRIPT_URI' => 'https://lithium.com',
+			'HTTPS' => null
+		)));
+		$this->assertTrue($request->env('HTTPS'));
 	}
 
 	public function testRemoteAddr() {
-		$_SERVER['REMOTE_ADDR'] = '123.456.789.000';
-		$request = new Request();
-
-		$expected = '123.456.789.000';
-		$result = $request->env('REMOTE_ADDR');
-		$this->assertEqual($expected, $result);
+		$request = new Request(array('env' => array('REMOTE_ADDR' => '123.456.789.000')));
+		$this->assertEqual('123.456.789.000', $request->env('REMOTE_ADDR'));
 	}
 
 	public function testRemoteAddrFromHttpPcRemoteAddr() {
 		$request = new MockIisRequest();
-
-		$expected = '123.456.789.000';
-		$result = $request->env('REMOTE_ADDR');
-		$this->assertEqual($expected, $result);
+		$this->assertEqual('123.456.789.000', $request->env('REMOTE_ADDR'));
 	}
 
 	public function testBase() {
-		$_SERVER['PHP_SELF'] = '/index.php';
-		$request = new Request();
-
-		$expected = null;
-		$result = $request->env('base');
-		$this->assertEqual($expected, $result);
+		$request = new Request(array('env' => array('PHP_SELF' => '/index.php')));
+		$this->assertFalse($request->env('base'));
 	}
 
 	public function testBaseWithDirectory() {
-		$_SERVER['PHP_SELF'] = '/lithium.com/app/webroot/index.php';
-		$request = new Request();
-
-		$expected = '/lithium.com';
-		$result = $request->env('base');
-		$this->assertEqual($expected, $result);
+		$request = new Request(array('env' => array(
+			'PHP_SELF' => '/lithium.com/app/webroot/index.php'
+		)));
+		$this->assertEqual('/lithium.com', $request->env('base'));
 	}
 
 	public function testBaseWithAppAndOtherDirectory() {
-		$_SERVER['PHP_SELF'] = '/lithium.com/app/other/webroot/index.php';
-		$request = new Request();
-
-		$expected = '/lithium.com/app/other';
-		$result = $request->env('base');
-		$this->assertEqual($expected, $result);
+		$request = new Request(array('env' => array(
+			'PHP_SELF' => '/lithium.com/app/other/webroot/index.php'
+		)));
+		$this->assertEqual('/lithium.com/app/other', $request->env('base'));
 	}
 
 	public function testPhpSelfTranslatedForIIS() {
 		$request = new MockIisRequest();
-
-		$expected = '/index.php';
-		$result = $request->env('PHP_SELF');
-		$this->assertEqual($expected, $result);
+		$this->assertEqual('/index.php', $request->env('PHP_SELF'));
 	}
 
 	public function testServerHttpBase() {
@@ -190,9 +164,8 @@ class RequestTest extends \lithium\test\Unit {
 	public function testCgiPlatform() {
 		$request = new MockCgiRequest();
 
-		$expected = true;
 		$result = $request->env('CGI_MODE');
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 	}
 
 	public function testCgiScriptUrl() {
@@ -215,9 +188,8 @@ class RequestTest extends \lithium\test\Unit {
 		$result = $request->get('data:Article');
 		$this->assertEqual($expected, $result);
 
-		$expected = null;
 		$result = $request->get('not:Post');
-		$this->assertEqual($expected, $result);
+		$this->assertNull($result);
 
 		$expected = '/lithium.com';
 		$result = $request->get('env:base');
@@ -259,18 +231,16 @@ class RequestTest extends \lithium\test\Unit {
 			return true;
 		}));
 
-		$expected = true;
 		$result = $request->is('cool');
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 	}
 
 	public function testDetectWithArrayRegex() {
 		$request = new Request(array('env' => array('SOME_COOL_DETECTION' => 'this is cool')));
 		$request->detect('cool', array('SOME_COOL_DETECTION', '/cool/'));
 
-		$expected = true;
 		$result = $request->is('cool');
-		$this->assertEqual($expected, $result);
+		$this->assertTrue($result);
 	}
 
 	public function testDetectSsl() {

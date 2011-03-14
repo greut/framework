@@ -8,13 +8,17 @@
 
 namespace lithium\analysis;
 
+use ReflectionClass;
 use lithium\util\String;
+use lithium\analysis\Inspector;
 
 /**
  * The `Debugger` class provides basic facilities for generating and rendering meta-data about the
  * state of an application in its current context.
  */
 class Debugger extends \lithium\core\Object {
+
+	protected static $_closureCache = array();
 
 	/**
 	 * Outputs a stack trace based on the supplied options.
@@ -38,7 +42,8 @@ class Debugger extends \lithium\core\Object {
 			'start' => 0,
 			'scope' => array(),
 			'trace' => array(),
-			'includeScope' => true
+			'includeScope' => true,
+			'closures' => true,
 		);
 		$options += $defaults;
 
@@ -68,6 +73,9 @@ class Debugger extends \lithium\core\Object {
 				}
 			}
 
+			if ($options['closures'] && strpos($function, '{closure}') !== false) {
+				$function = static::_closureDef($backtrace[$i], $function);
+			}
 			if (in_array($function, array('call_user_func_array', 'trigger_error'))) {
 				continue;
 			}
@@ -115,6 +123,76 @@ class Debugger extends \lithium\core\Object {
 			$export = str_replace($replace, $with, $export);
 		}
 		return $export;
+	}
+
+	/**
+	 * Locates original location of closures.
+	 *
+	 * @param mixed $reference File or class name to inspect.
+	 * @param integer $callLine Line number of class reference.
+	 */
+	protected static function _definition($reference, $callLine) {
+		if (file_exists($reference)) {
+			foreach (array_reverse(token_get_all(file_get_contents($reference))) as $token) {
+				if (!is_array($token) || $token[2] > $callLine) {
+					continue;
+				}
+				if ($token[0] === T_FUNCTION) {
+					return $token[2];
+				}
+			}
+			return;
+		}
+		list($class, $method) = explode('::', $reference);
+
+		if (!class_exists($class)) {
+			return;
+		}
+
+		$classRef = new ReflectionClass($class);
+		$methodInfo = Inspector::info($reference);
+		$methodDef = join("\n", Inspector::lines($classRef->getFileName(), range(
+			$methodInfo['start'] + 1, $methodInfo['end'] - 1
+		)));
+
+		foreach (array_reverse(token_get_all("<?php {$methodDef} ?>")) as $token) {
+			if (!is_array($token) || $token[2] > $callLine) {
+				continue;
+			}
+			if ($token[0] === T_FUNCTION) {
+				return $token[2] + $methodInfo['start'];
+			}
+		}
+	}
+
+	protected static function _closureDef($frame, $function) {
+		$reference = '::';
+		$frame += array('file' => '??', 'line' => '??');
+		$cacheKey = "{$frame['file']}@{$frame['line']}";
+
+		if (isset(static::$_closureCache[$cacheKey])) {
+			return static::$_closureCache[$cacheKey];
+		}
+
+		if ($class = Inspector::classes(array('file' => $frame['file']))) {
+			foreach (Inspector::methods(key($class), 'extents') as $method => $extents) {
+				$line = $frame['line'];
+
+				if (!($extents[0] <= $line && $line <= $extents[1])) {
+					continue;
+				}
+				$class = key($class);
+				$reference = "{$class}::{$method}";
+				$function = "{$reference}()::{closure}";
+				break;
+			}
+		} else {
+			$reference = $frame['file'];
+			$function = "{$reference}::{closure}";
+		}
+		$line = static::_definition($reference, $frame['line']) ?: '?';
+		$function .= " @ {$line}";
+		return static::$_closureCache[$cacheKey] = $function;
 	}
 }
 

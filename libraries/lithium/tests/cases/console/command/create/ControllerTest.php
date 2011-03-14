@@ -21,7 +21,7 @@ class ControllerTest extends \lithium\test\Unit {
 	protected $_testPath = null;
 
 	public function skip() {
-		$this->_testPath = LITHIUM_APP_PATH . '/resources/tmp/tests';
+		$this->_testPath = Libraries::get(true, 'resources') . '/tmp/tests';
 		$this->skipIf(!is_writable($this->_testPath), "{$this->_testPath} is not writable.");
 	}
 
@@ -63,7 +63,7 @@ class ControllerTest extends \lithium\test\Unit {
 			'request' => $this->request, 'classes' => $this->classes
 		));
 
-		$expected = '\\create_test\\models\\Post';
+		$expected = 'create_test\\models\\Post';
 		$result = $model->invokeMethod('_use', array($this->request));
 		$this->assertEqual($expected, $result);
 	}
@@ -87,7 +87,7 @@ class ControllerTest extends \lithium\test\Unit {
 
 namespace create_test\controllers;
 
-use \create_test\models\Post;
+use create_test\models\Post;
 
 class PostsController extends \lithium\action\Controller {
 

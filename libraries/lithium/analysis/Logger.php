@@ -8,7 +8,7 @@
 
 namespace lithium\analysis;
 
-use \UnexpectedValueException;
+use UnexpectedValueException;
 
 /**
  * The `Logger` class provides a consistent, application-wide interface for configuring and writing
@@ -105,7 +105,7 @@ class Logger extends \lithium\core\Adaptable {
 		if ($name = $options['name']) {
 			$methods = array($name => static::adapter($name)->write($priority, $message, $options));
 		} elseif (!isset(static::$_priorities[$priority])) {
-			$message = "Attempted to write log message with invalid priority '{$priority}'.";
+			$message = "Attempted to write log message with invalid priority `{$priority}`.";
 			throw new UnexpectedValueException($message);
 		} else {
 			$methods = static::_configsByPriority($priority, $message, $options);
@@ -114,7 +114,7 @@ class Logger extends \lithium\core\Adaptable {
 		foreach ($methods as $name => $method) {
 			$params = compact('priority', 'message', 'options');
 			$config = static::_config($name);
-			$result = $result && static::_filter(__FUNCTION__, $params, $method, $config['filters']);
+			$result &= static::_filter(__FUNCTION__, $params, $method, $config['filters']);
 		}
 		return $methods ? $result : false;
 	}

@@ -128,7 +128,7 @@ class MySql extends \lithium\data\source\Database {
 		} else {
 			$this->connection = mysql_pconnect($host, $config['login'], $config['password']);
 		}
-		
+
 		if (!$this->connection) {
 			return false;
 		}
@@ -138,7 +138,7 @@ class MySql extends \lithium\data\source\Database {
 		} else {
 			return false;
 		}
-		
+
 		if ($config['encoding']) {
 			$this->encoding($config['encoding']);
 		}
@@ -271,10 +271,10 @@ class MySql extends \lithium\data\source\Database {
 		}
 
 		$result = array();
-		$count = mysql_num_fields($resource);
+		$count = mysql_num_fields($resource->resource());
 
 		for ($i = 0; $i < $count; $i++) {
-			$result[] = mysql_field_name($resource, $i);
+			$result[] = mysql_field_name($resource->resource(), $i);
 		}
 		return $result;
 	}
@@ -301,9 +301,9 @@ class MySql extends \lithium\data\source\Database {
 	/**
 	 * @todo Eventually, this will need to rewrite aliases for DELETE and UPDATE queries, same with
 	 *       order().
-	 * @param string $conditions 
-	 * @param string $context 
-	 * @param array $options 
+	 * @param string $conditions
+	 * @param string $context
+	 * @param array $options
 	 * @return void
 	 */
 	public function conditions($conditions, $context, array $options = array()) {

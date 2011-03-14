@@ -57,6 +57,13 @@ use lithium\core\ClassNotFoundException;
 class Libraries {
 
 	/**
+	 * Stores the closures that represent the method filters. They are indexed by method name.
+	 *
+	 * @var array
+	 */
+	protected static $_methodFilters = array();
+
+	/**
 	 * The list of class libraries registered with the class loader.
 	 *
 	 * @var array
@@ -231,26 +238,30 @@ class Libraries {
 	 * that contains the `lithium` directory), however, you can change this on a case-by-case basis
 	 * using the `'path'` key to specify an absolute path to the library's directory.
 	 *
-	 * @param string $name Library name, i.e. `'app'`, `'lithium'`, `'pear'` or `'solar'`.
+	 * @param string $name Library name, i.e. `'app'`, `'lithium'`, `'pear'` or `'aura'`.
 	 * @param array $config Specifies where the library is in the filesystem, and how classes
 	 *        should be loaded from it.  Allowed keys are:
-	 *        - `'bootstrap'`: A file path (relative to `'path'`) to a bootstrap script that should
-	 *          be run when the library is added.
-	 *        - `'defer'`: If true, indicates that, when locating classes, this library should
-	 *          defer to other libraries in order of preference.
-	 *        - `'includePath'`: If `true`, appends the absolutely-resolved value of `'path'` to
-	 *          the PHP include path.
+	 *        - `'bootstrap'` _mixed_: A file path (relative to `'path'`) to a bootstrap script that
+	 *          should be run when the library is added, or `true` to use the default bootstrap
+	 *          path, i.e. `config/bootstrap.php`.
+	 *        - `'defer'` _boolean_: If `true`, indicates that, when locating classes, this library
+	 *          should defer to other libraries in order of preference.
+	 *        - `'includePath'` _mixed_: If `true`, appends the absolutely-resolved value of
+	 *          `'path'` to the PHP include path. If a string, the value is appended to PHP's.
 	 *        - `'loader'`: An auto-loader method associated with the library, if any.
 	 *        - `'path'`: The directory containing the library.
-	 *        - `'prefix'`: The class prefix this library uses, i.e. `'lithium\'`, `'Zend_'` or
-	 *          `'Solar_'`.
-	 *        - `'suffix'`: Gets appended to the end of the file name. For example, most libraries
-	 *          end classes in `'.php'`, but some use `'.class.php'`, or `'.inc.php'`.
-	 *        - `'transform'`: Defines a custom way to transform a class name into its
+	 *        - `'prefix'` _string_: The class prefix this library uses, i.e. `'lithium\'`,
+	 *          `'Zend_'` or `'Solar_'`. If the library has no global prefix, set to `false`.
+	 *        - `'suffix'` _string_: Gets appended to the end of the file name. For example, most
+	 *          libraries end classes in `'.php'`, but some use `'.class.php'`, or `'.inc.php'`.
+	 *        - `'transform'` _closure_: Defines a custom way to transform a class name into its
 	 *          corresponding file path.  Accepts either an array of two strings which are
 	 *          interpreted as the pattern and replacement for a regex, or an anonymous function,
 	 *          which receives the class name and library configuration arrays as parameters, and
 	 *          returns the full physical file path as output.
+	 *        - `'resources'` _string_: If this is the default library, this maybe set to the
+	 *          absolute path to the write-enabled application resources directory, which is used
+	 *          for caching, log files, uploads, etc.
 	 * @return array Returns the resulting set of options created for this library.
 	 */
 	public static function add($name, array $config = array()) {
@@ -275,12 +286,13 @@ class Libraries {
 			static::$_default = $name;
 			$defaults['path'] = LITHIUM_APP_PATH;
 			$defaults['bootstrap'] = false;
+			$defaults['resources'] = LITHIUM_APP_PATH . '/resources';
 		}
 		$config += $defaults;
 
 		if (!$config['path']) {
 			if (!$config['path'] = static::_locatePath('libraries', compact('name'))) {
-				throw new ConfigException("Library '{$name}' not found.");
+				throw new ConfigException("Library `{$name}` not found.");
 			}
 		}
 		$config['path'] = str_replace('\\', '/', $config['path']);
@@ -317,13 +329,20 @@ class Libraries {
 	 * Returns configuration for given name.
 	 *
 	 * @param string $name Registered library to retrieve configuration for.
-	 * @return array Retrieved configuration.
+	 * @param string $key Optional key name. If `$name` is set and is the name of a valid library,
+	 *               returns the given named configuration key, i.e. `'path'`, `'webroot'` or
+	 *               `'resources'`.
+	 * @return mixed A configuation array for one or more libraries, or a string value if `$key` is
+	 *               specified.
 	 */
-	public static function get($name = null) {
+	public static function get($name = null, $key = null) {
 		$configs = static::$_configurations;
 
 		if (!$name) {
 			return $configs;
+		}
+		if ($name === true) {
+			$name = static::$_default;
 		}
 		if (is_array($name)) {
 			foreach ($name as $i => $key) {
@@ -332,10 +351,12 @@ class Libraries {
 			}
 			return $name;
 		}
-		if ($name === true) {
-			$name = static::$_default;
+		$config = isset($configs[$name]) ? $configs[$name] : null;
+
+		if (!$key) {
+			return $config;
 		}
-		return isset($configs[$name]) ? $configs[$name] : null;
+		return isset($config[$key]) ? $config[$key] : null;
 	}
 
 	/**
@@ -428,7 +449,7 @@ class Libraries {
 			static::$_cachedPaths[$class] = $path;
 			method_exists($class, '__init') ? $class::__init() : null;
 		} elseif ($require) {
-			throw new RuntimeException("Failed to load {$class} from {$path}");
+			throw new RuntimeException("Failed to load class `{$class}` from path `{$path}`.");
 		}
 	}
 
@@ -470,15 +491,50 @@ class Libraries {
 			$fullPath = "{$params['path']}/{$path}";
 
 			if (!$options['dirs']) {
-				return static::$_cachedPaths[$class] = realpath($fullPath . $suffix);
+				return static::$_cachedPaths[$class] = static::realPath($fullPath . $suffix);
 			}
 			$list = glob(dirname($fullPath) . '/*');
 			$list = array_map(function($i) { return str_replace('\\', '/', $i); }, $list);
 
 			if (in_array($fullPath . $suffix, $list)) {
-				return static::$_cachedPaths[$class] = realpath($fullPath . $suffix);
+				return static::$_cachedPaths[$class] = static::realPath($fullPath . $suffix);
 			}
-			return is_dir($fullPath) ? realpath($fullPath) : null;
+			return is_dir($fullPath) ? static::realPath($fullPath) : null;
+		}
+	}
+
+	/**
+	 * Wraps the PHP `realpath()` function to add support for finding paths to files inside Phar
+	 * archives.
+	 *
+	 * @param string $path An unresolved path to a file inside a Phar archive which may or may not
+	 *               exist.
+	 * @return string If `$path` is a valid path to a file inside a Phar archive, returns a string
+	 *                in the format `'phar://<path-to-phar>/<path-to-file>'`. Otherwise returns
+	 *                `null`.
+	 */
+	public static function realPath($path) {
+		if (($absolutePath = realpath($path)) !== false) {
+			return $absolutePath;
+		}
+		if (!preg_match('%^phar://([^.]+\.phar(?:\.gz)?)(.+)%', $path, $pathComponents)) {
+			return;
+		}
+		list(, $relativePath, $pharPath) = $pathComponents;
+
+		$pharPath = implode('/', array_reduce(explode('/', $pharPath), function ($parts, $value) {
+			if ($value == '..') {
+				array_pop($parts);
+			} elseif ($value != '.') {
+				$parts[] = $value;
+			}
+			return $parts;
+		}));
+
+		if (($resolvedPath = realpath($relativePath)) !== false) {
+			if (file_exists($absolutePath = "phar://{$resolvedPath}{$pharPath}")) {
+				return $absolutePath;
+			}
 		}
 	}
 
@@ -523,12 +579,54 @@ class Libraries {
 	 * @return object If the class is found, returns an instance of it, otherwise throws an
 	 *         exception.
 	 * @throws lithium\core\ClassNotFoundException Throws an exception if the class can't be found.
+	 * @filter
 	 */
 	public static function instance($type, $name, array $options = array()) {
-		if (!$class = (string) static::locate($type, $name)) {
-			throw new ClassNotFoundException("Class '{$name}' of type '{$type}' not found.");
+		$params = compact('type', 'name', 'options');
+		$_paths =& static::$_paths;
+
+		$implementation = function($self, $params) use (&$_paths) {
+			$name = $params['name'];
+			$type = $params['type'];
+
+			if (!$name && !$type) {
+				$message = "Invalid class lookup: `\$name` and `\$type` are empty.";
+				throw new ClassNotFoundException($message);
+			}
+			if (!is_string($type) && $type !== null && !isset($_paths[$type])) {
+				throw new ClassNotFoundException("Invalid class type `{$type}`.");
+			}
+			if (!$class = $self::locate($type, $name)) {
+				throw new ClassNotFoundException("Class `{$name}` of type `{$type}` not found.");
+			}
+			if (is_object($class)) {
+				return $class;
+			}
+			$success = (is_string($class) && class_exists($class));
+			return $success ? new $class($params['options']) : null;
+		};
+		if (!isset(static::$_methodFilters[__FUNCTION__])) {
+			return $implementation(get_called_class(), $params);
 		}
-		return class_exists($class) ? new $class($options) : null;
+		$class = get_called_class();
+		$method = __FUNCTION__;
+		$data = array_merge(static::$_methodFilters[__FUNCTION__], array($implementation));
+		return Filters::run($class, $params, compact('data', 'class', 'method'));
+	}
+
+	/**
+	 * Apply a closure to a method in `Libraries`.
+	 *
+	 * @see lithium\util\collection\Filters
+	 * @param string $method The name of the method to apply the closure to.
+	 * @param closure $filter The closure that is used to filter the method.
+	 * @return void
+	 */
+	public static function applyFilter($method, $filter = null) {
+		if (!isset(static::$_methodFilters[$method])) {
+			static::$_methodFilters[$method] = array();
+		}
+		static::$_methodFilters[$method][] = $filter;
 	}
 
 	/**
@@ -717,10 +815,9 @@ class Libraries {
 	 * @return array
 	 */
 	protected static function _locateAll(array $params, array $options = array()) {
-		$defaults = array(
-			'libraries' => null, 'recursive' => true, 'namespaces' => false
-		);
+		$defaults = array('libraries' => null, 'recursive' => true, 'namespaces' => false);
 		$options += $defaults;
+
 		$paths = (array) static::$_paths[$params['type']];
 		$libraries = $options['library'] ? $options['library'] : $options['libraries'];
 		$libraries = static::get((array) $libraries);

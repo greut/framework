@@ -9,8 +9,8 @@
 
 namespace lithium\util;
 
-use \Closure;
-use \Exception;
+use Closure;
+use Exception;
 
 /**
  * String manipulation utility class. Includes functionality for hashing, UUID generation,
@@ -37,7 +37,7 @@ class String {
 	 * Seeds the random generator if it has yet to be done.
 	 *
 	 * @return boolean Success.
-	 **/
+	 */
 	public static function seed() {
 		// Seeding more than once means less entropy, not more, so bail
 		if (isset(static::$_urandom)) {
@@ -198,6 +198,7 @@ class String {
 	 * $check2  = String::checkPassword($password, $hashed2); // True
 	 * }}}
 	 *
+	 * @see lithium\util\String::genSalt()
 	 * @param string $password The password to hash.
 	 * @param string $salt Optional. The salt string.
 	 * @return string The hashed password.
@@ -205,7 +206,6 @@ class String {
 	 *        - 60 chars for Blowfish hashes
 	 *        - 20 chars for XDES hashes
 	 *        - 34 chars for MD5 hashes
-	 * @see lithium\util\String::genSalt()
 	 **/
 	public static function hashPassword($password, $salt = null) {
 		return crypt($password, $salt ?: static::genSalt());
@@ -214,12 +214,12 @@ class String {
 	/**
 	 * Compares a password and its hashed value using PHP's `crypt()`.
 	 *
+	 * @see lithium\util\String::hashPassword()
+	 * @see lithium\util\String::genSalt()
 	 * @param string $password The password to check
 	 * @param string $hash The hashed password to compare
 	 * @return boolean Whether the password is correct or not
-	 * @see lithium\util\String::hashPassword()
-	 * @see lithium\util\String::genSalt()
-	 **/
+	 */
 	public static function checkPassword($password, $hash) {
 		return $hash == crypt($password, $hash);
 	}
@@ -253,6 +253,9 @@ class String {
 	 * consisting in random sequences of alpha numeric characters, combine
 	 * `String::random()` and `String::encode64()` instead.
 	 *
+	 * @link http://php.net/manual/en/function.crypt.php
+	 * @link http://www.postgresql.org/docs/9.0/static/pgcrypto.html
+	 * @see lithium\util\String::hashPassword()
 	 * @param string $type The hash type. Optional. Defaults to '`bf`'.
 	 *        Supported values include:
 	 *        - `'bf'`: Blowfish (128 salt bits, adaptive, max 72 chars)
@@ -263,10 +266,7 @@ class String {
 	 *        - `10` for Blowfish
 	 *        - `18` for XDES
 	 * @return string The salt string.
-	 * @link http://php.net/manual/en/function.crypt.php
-	 * @link http://www.postgresql.org/docs/9.0/static/pgcrypto.html
-	 * @see lithium\util\String::hashPassword()
-	 **/
+	 */
 	public static function genSalt($type = null, $count = null) {
 		switch (true) {
 			case CRYPT_BLOWFISH == 1 && (!$type || $type === 'bf'):
@@ -292,9 +292,9 @@ class String {
 	 * $salt = String::encode64(String::random(8)); // 64 bits
 	 * }}}
 	 *
+	 * @see lithium\util\String::random()
 	 * @param string $input The input bytes.
 	 * @return string The same bytes in the `/.0-9A-Za-z` alphabet.
-	 * @see lithium\util\String::random()
 	 */
 	public static function encode64($input) {
 		$base64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -335,11 +335,12 @@ class String {
 	 * @param integer $count The base-2 logarithm of the iteration count.
 	 *        Defaults to `10`. Can be `4` to `31`.
 	 * @return string $salt
-	 **/
+	 */
 	protected static function _genSaltBf($count = 10) {
 		$count = (integer) $count;
-		if ($count < 4 || $count > 31)
+		if ($count < 4 || $count > 31) {
 			$count = 10;
+		}
 
 		// We don't use the encode64() method here because it could result
 		// in 2 bits less of entropy depending on the last char.
@@ -386,8 +387,9 @@ class String {
 	 */
 	protected static function _genSaltXDES($count = 18) {
 		$count = (integer) $count;
-		if ($count < 1 || $count > 24)
+		if ($count < 1 || $count > 24) {
 			$count = 16;
+		}
 
 		// Count should be odd to not reveal weak DES keys
 		$count = (1 << $count) - 1;
@@ -410,7 +412,7 @@ class String {
 	 * Generates an MD5 salt for use in `String::hashPassword()`.
 	 *
 	 * @return string The MD5 salt.
-	 **/
+	 */
 	protected static function _genSaltMD5() {
 		$output = '$1$'
 			// 48 bits of salt

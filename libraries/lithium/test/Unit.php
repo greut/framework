@@ -8,14 +8,14 @@
 
 namespace lithium\test;
 
-use \Exception;
+use Exception;
 use lithium\util\String;
 use lithium\core\Libraries;
 use lithium\util\Validator;
 use lithium\analysis\Debugger;
 use lithium\analysis\Inspector;
-use \RecursiveDirectoryIterator;
-use \RecursiveIteratorIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 /**
  * This is the base class for all test cases. Test are performed using an assertion method. If the
@@ -121,7 +121,7 @@ class Unit extends \lithium\core\Object {
 	 * @param string $message Message to pass if the condition is met.
 	 * @return mixed
 	 */
-	public function skipIf($condition, $message = 'Skipped test {:class}::{:function}()') {
+	public function skipIf($condition, $message = 'Skipped test `{:class}::{:function}()`.') {
 		if (!$condition) {
 			return;
 		}
@@ -212,7 +212,9 @@ class Unit extends \lithium\core\Object {
 			$params['message'] = $this->_message($params);
 			$message = String::insert($message, $params);
 		}
-		$trace = Debugger::trace(array('start' => 1, 'format' => 'array'));
+		$trace = Debugger::trace(array(
+			'start' => 1, 'depth' => 4, 'format' => 'array', 'closures' => !$expression
+		));
 		$methods = $this->methods();
 		$i = 1;
 
@@ -230,7 +232,7 @@ class Unit extends \lithium\core\Object {
 			'method'    => $trace[$i]['function'],
 			'assertion' => $trace[$i - 1]['function'],
 		);
-		$this->_result(($expression ? 'pass' : 'fail'), $result);
+		$this->_result($expression ? 'pass' : 'fail', $result);
 		return $expression;
 	}
 
@@ -726,18 +728,23 @@ class Unit extends \lithium\core\Object {
 	 * @return array Data with the keys `trace'`, `'expected'` and `'result'`.
 	 */
 	protected function _compare($type, $expected, $result = null, $trace = null) {
-		$types = array('expected' => gettype($expected), 'result' => gettype($result));
+		$compareTypes = function($expected, $result, $trace) {
+			$types = array('expected' => gettype($expected), 'result' => gettype($result));
 
-		if ($types['expected'] !== $types['result']) {
-			return array('trace' => $trace,
-				'expected' => trim("({$types['expected']}) " . print_r($expected, true)),
-				'result' => trim("({$types['result']}) " . print_r($result, true))
-			);
+			if ($types['expected'] !== $types['result']) {
+				$expected = trim("({$types['expected']}) " . print_r($expected, true));
+				$result = trim("({$types['result']}) " . print_r($result, true));
+				return compact('trace', 'expected', 'result');
+			}
+		};
+		if ($types = $compareTypes($expected, $result, $trace)) {
+			return $types;
 		}
 		$data = array();
 
 		if (!is_scalar($expected)) {
 			foreach ($expected as $key => $value) {
+				$newTrace = "{$trace}[{$key}]";
 				$isObject = false;
 
 				if (is_object($expected)) {
@@ -745,8 +752,13 @@ class Unit extends \lithium\core\Object {
 					$expected = (array) $expected;
 					$result = (array) $result;
 				}
-				$check = array_key_exists($key, $result) ? $result[$key] : array();
-				$newTrace = "{$trace}[{$key}]";
+				if (!array_key_exists($key, $result)) {
+					$trace = (!$key) ? null : $newTrace;
+					$expected = (!$key) ? $expected : $value;
+					$result = ($key) ? null : $result;
+					return compact('trace', 'expected', 'result');
+				}
+				$check = $result[$key];
 
 				if ($isObject) {
 					$newTrace = ($trace) ? "{$trace}->{$key}" : $key;
@@ -755,6 +767,9 @@ class Unit extends \lithium\core\Object {
 				}
 				if ($type === 'identical') {
 					if ($value === $check) {
+						if ($types = $compareTypes($value, $check, $trace)) {
+							return $types;
+						}
 						continue;
 					}
 					if ($check === array()) {
@@ -769,6 +784,9 @@ class Unit extends \lithium\core\Object {
 					}
 				} else {
 					if ($value == $check) {
+						if ($types = $compareTypes($value, $check, $trace)) {
+							return $types;
+						}
 						continue;
 					}
 					if (!is_array($value)) {
@@ -786,7 +804,6 @@ class Unit extends \lithium\core\Object {
 				return $data;
 			}
 		}
-
 		if (!is_scalar($result)) {
 			$data = $this->_compare($type, $result, $expected);
 
@@ -798,14 +815,10 @@ class Unit extends \lithium\core\Object {
 				);
 			}
 		}
-
-		if ($type === 'identical') {
-			if ($expected === $result) {
-				return true;
+		if ((($type === 'identical') ? $expected === $result : $expected == $result)) {
+			if ($types = $compareTypes($expected, $result, $trace)) {
+				return $types;
 			}
-			return compact('trace', 'expected', 'result');
-		}
-		if ($expected == $result) {
 			return true;
 		}
 		return compact('trace', 'expected', 'result');
@@ -887,13 +900,15 @@ class Unit extends \lithium\core\Object {
 	 * @return void
 	 */
 	protected function _cleanUp($path = null) {
-		$path = $path ?: LITHIUM_APP_PATH . '/resources/tmp/tests';
-		$path = $path[0] !== '/' ? LITHIUM_APP_PATH . '/resources/tmp/' . $path : $path;
+		$path = $path ?: Libraries::get(true, 'resources') . '/tmp/tests';
+		$path = $path[0] !== '/' ? Libraries::get(true, 'resources') . '/tmp/' . $path : $path;
+
 		if (!is_dir($path)) {
 			return;
 		}
 		$dirs = new RecursiveDirectoryIterator($path);
 		$iterator = new RecursiveIteratorIterator($dirs, RecursiveIteratorIterator::CHILD_FIRST);
+
 		foreach ($iterator as $item) {
 			if ($item->getPathname() === "{$path}/empty" || $iterator->isDot()) {
 				continue;
