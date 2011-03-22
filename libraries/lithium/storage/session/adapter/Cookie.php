@@ -114,14 +114,19 @@ class Cookie extends \lithium\core\Object {
 		return function($self, $params) use (&$config) {
 			$key = $params['key'];
 			if (!$key) {
-				return $_COOKIE;
+				if (isset($_COOKIE[$config['name']])) {
+					return $_COOKIE[$config['name']];
+				}
+				return array();
 			}
 			if (strpos($key, '.') !== false) {
 				$key = explode('.', $key);
-				$result = $_COOKIE[$config['name']];
+				$result = (isset($_COOKIE[$config['name']])) ? $_COOKIE[$config['name']] : array();
 
 				foreach ($key as $k) {
-					$result = $result[$k];
+					if (isset($result[$k])) {
+						$result = $result[$k];
+					}
 				}
 				return ($result !== array()) ? $result : null;
 			}
@@ -142,38 +147,32 @@ class Cookie extends \lithium\core\Object {
 	public function write($key, $value = null, array $options = array()) {
 		$expire = (!isset($options['expire']) && empty($this->_config['expire']));
 		$config = $this->_config;
+		$cookieClass = __CLASS__;
 
 		if ($expire && $key != $config['name']) {
 			return null;
 		}
 		$expires = (isset($options['expire'])) ? $options['expire'] : $config['expire'];
 
-		return function($self, $params) use (&$config, &$expires) {
+		return function($self, $params) use (&$config, &$expires, $cookieClass) {
 			$key = $params['key'];
 			$value = $params['value'];
-			$key = is_array($key) ? Set::flatten($key) : array($key => $value);
+			$key = array($key => $value);
+			if (is_array($value)) {
+				$key = Set::flatten($key);
+			}
 
 			foreach ($key as $name => $val) {
-				$name = explode('.', $name);
-				$name = $config['name'] ? array_merge(array($config['name']), $name) : $name;
-
-				if (count($name) == 1) {
-					$name = current($name);
-				} else {
-					$name = (array_shift($name) . '[' . join('][', $name) . ']');
-				}
-				if (is_array($val)) {
-					foreach ($val as $key => $v) {
-						setcookie($name . "[$key]", $v, strtotime($expires), $config['path'],
-							$config['domain'], $config['secure'], $config['httponly']
-						);
-					}
-					return true;
-				}
-				setcookie($name, $val, strtotime($expires), $config['path'],
+				$name = $cookieClass::keyFormat($name, $config);
+				$result = setcookie($name, $val, strtotime($expires), $config['path'],
 					$config['domain'], $config['secure'], $config['httponly']
 				);
+
+				if (!$result) {
+					throw new RuntimeException("There was an error setting {$name} cookie.");
+				}
 			}
+			return true;
 		};
 	}
 
@@ -186,25 +185,74 @@ class Cookie extends \lithium\core\Object {
 	 */
 	public function delete($key, array $options = array()) {
 		$config = $this->_config;
+		$cookieClass = get_called_class();
 
-		return function($self, $params) use (&$config) {
+		return function($self, $params) use (&$config, $cookieClass) {
 			$key = $params['key'];
-			$key = is_array($key) ? Set::flatten($key) : array($key);
-
-			foreach ($key as $name) {
-				$name = explode('.', $name);
-				$name = $config['name'] ? array_merge(array($config['name']), $name) : $name;
-
-				if (count($name) == 1) {
-					$name = current($name);
-				} else {
-					$name = (array_shift($name) . '[' . join('][', $name) . ']');
+			$path = '/' . str_replace('.', '/', $config['name'] . '.' . $key) . '/.';
+			$cookies = current(Set::extract($_COOKIE, $path));
+			if (is_array($cookies)) {
+				$cookies = array_keys(Set::flatten($cookies));
+				foreach ($cookies as &$name) {
+					$name = $key . '.' . $name;
 				}
-				setcookie($name, "", time() - 1, $config['path'],
+			} else {
+				$cookies = array($key);
+			}
+			foreach ($cookies as &$name) {
+				$name = $cookieClass::keyFormat($name, $config);
+				$result = setcookie($name, "", 1, $config['path'],
 					$config['domain'], $config['secure'], $config['httponly']
 				);
+				if (!$result) {
+					throw new RuntimeException("There was an error deleting {$name} cookie.");
+				}
 			}
+			return true;
 		};
+	}
+
+	/**
+	 * Clears all cookies.
+	 *
+	 * @param array $options Options array. Not used fro this adapter method.
+	 * @return boolean True on successful clear, false otherwise.
+	 */
+	public function clear(array $options = array()) {
+		$options += array('destroySession' => true);
+		$config = $this->_config;
+		$cookieClass = get_called_class();
+
+		return function($self, $params) use (&$config, $options, $cookieClass) {
+			if ($options['destroySession'] && session_id()) {
+				session_destroy();
+			}
+			if (!isset($_COOKIE[$config['name']])) {
+				return true;
+			}
+			$cookies = array_keys(Set::flatten($_COOKIE[$config['name']]));
+			foreach ($cookies as $name) {
+				$name = $cookieClass::keyFormat($name, $config);
+				$result = setcookie($name, "", 1, $config['path'],
+					$config['domain'], $config['secure'], $config['httponly']
+				);
+				if (!$result) {
+					throw new RuntimeException("There was an error clearing {$cookie} cookie.");
+				}
+			}
+			unset($_COOKIE[$config['name']]);
+			return true;
+		};
+	}
+
+	/**
+	 * Formats the given `$name` argument for use in the cookie adapter.
+	 *
+	 * @param string $name The key to be formatted, e.g. `foo.bar.baz`.
+	 * @return string The formatted key.
+	 */
+	public static function keyFormat($name, $config) {
+		return $config['name'] . '[' . str_replace('.', '][', $name) . ']';
 	}
 }
 
