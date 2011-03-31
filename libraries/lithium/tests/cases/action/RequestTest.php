@@ -2,7 +2,7 @@
 /**
  * Lithium: the most rad php framework
  *
- * @copyright     Copyright 2010, Union of RAD (http://union-of-rad.org)
+ * @copyright     Copyright 2011, Union of RAD (http://union-of-rad.org)
  * @license       http://opensource.org/licenses/bsd-license.php The BSD License
  */
 
@@ -920,6 +920,24 @@ class RequestTest extends \lithium\test\Unit {
 		$this->assertEqual('text/plain', $result[0]);
 
 		$request = new Request(array('env' => array('HTTP_ACCEPT' => join(',', $android))));
+		$this->assertEqual('html', $request->accepts());
+	}
+
+	/**
+	 * Tests that `Accept` headers with only one listed content type are parsed property, and tests
+	 * that `'* /*'` is still parsed as `'text/html'`.
+	 */
+	public function testAcceptSingleContentType() {
+		$request = new Request(array('env' => array('HTTP_ACCEPT' => 'application/json,text/xml')));
+		$this->assertEqual(array('application/json', 'text/xml'), $request->accepts(true));
+		$this->assertEqual('json', $request->accepts());
+
+		$request = new Request(array('env' => array('HTTP_ACCEPT' => 'application/json')));
+		$this->assertEqual(array('application/json'), $request->accepts(true));
+		$this->assertEqual('json', $request->accepts());
+
+		$request = new Request(array('env' => array('HTTP_ACCEPT' => '*/*')));
+		$this->assertEqual(array('text/html'), $request->accepts(true));
 		$this->assertEqual('html', $request->accepts());
 	}
 }

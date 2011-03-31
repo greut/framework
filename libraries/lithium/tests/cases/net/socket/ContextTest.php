@@ -2,14 +2,13 @@
 /**
  * Lithium: the most rad php framework
  *
- * @copyright     Copyright 2010, Union of RAD (http://union-of-rad.org)
+ * @copyright     Copyright 2011, Union of RAD (http://union-of-rad.org)
  * @license       http://opensource.org/licenses/bsd-license.php The BSD License
  */
 
 namespace lithium\tests\cases\net\socket;
 
 use lithium\net\http\Request;
-use lithium\net\http\Response;
 use lithium\net\socket\Context;
 
 class ContextTest extends \lithium\test\Unit {
@@ -19,50 +18,54 @@ class ContextTest extends \lithium\test\Unit {
 		'scheme' => 'http',
 		'host' => 'localhost',
 		'port' => 80,
-		'timeout' => 30
+		'timeout' => 30,
+		'classes' => array('request' => 'lithium\net\http\Request')
 	);
 
-	protected $_testUrl = 'http://localhost';
-
-	public function setUp() {
-		$this->socket = new Context($this->_testConfig);
-		$message = "Could not open {$this->_testUrl} - skipping " . __CLASS__;
-		$this->skipIf(!fopen($this->_testUrl, 'r'), $message);
-	}
-
-	public function tearDown() {
-		unset($this->socket);
+	public function skip() {
+		$config = $this->_testConfig;
+		$url = "{$config['scheme']}://{$config['host']}";
+		$message = "Could not open {$url} - skipping " . __CLASS__;
+		$this->skipIf(!fopen($url, 'r'), $message);
 	}
 
 	public function testConstruct() {
 		$subject = new Context(array('timeout' => 300));
 		$this->assertTrue(300, $subject->timeout());
-		$subject->close();
 		unset($subject);
 	}
 
 	public function testGetSetTimeout() {
-		$this->assertEqual(30, $this->socket->timeout());
-		$this->assertEqual(25, $this->socket->timeout(25));
-		$this->assertEqual(25, $this->socket->timeout());
+		$stream = new Context($this->_testConfig);
+		$this->assertEqual(30, $stream->timeout());
+		$this->assertEqual(25, $stream->timeout(25));
+		$this->assertEqual(25, $stream->timeout());
 
-		$this->socket->open();
-		$this->assertEqual(25, $this->socket->timeout());
+		$stream->open();
+		$this->assertEqual(25, $stream->timeout());
 
-		$result = stream_context_get_options($this->socket->resource());
+		$result = stream_context_get_options($stream->resource());
 		$this->assertEqual(25, $result['http']['timeout']);
 	}
 
 	public function testOpen() {
-		$this->assertTrue(is_resource($this->socket->open()));
+		$stream = new Context($this->_testConfig);
+		$this->assertTrue(is_resource($stream->open()));
 	}
 
 	public function testClose() {
-		$this->assertEqual(true, $this->socket->close());
+		$stream = new Context($this->_testConfig);
+		$this->assertEqual(true, $stream->close());
 	}
 
 	public function testEncoding() {
-		$this->assertEqual(false, $this->socket->encoding());
+		$stream = new Context($this->_testConfig);
+		$this->assertEqual(false, $stream->encoding());
+	}
+
+	public function testEof() {
+		$stream = new Context($this->_testConfig);
+		$this->assertTrue(true, $stream->eof());
 	}
 
 	public function testMessageInConfig() {
@@ -74,11 +77,42 @@ class ContextTest extends \lithium\test\Unit {
 		$stream = new Context($this->_testConfig);
 		$this->assertTrue(is_resource($stream->open()));
 		$this->assertTrue(is_resource($stream->resource()));
+		$this->assertEqual(1, $stream->write());
+		$this->assertPattern("/^HTTP/", (string) $stream->read());
+	}
 
-		$response = $stream->send(new Request(), array('response' => 'lithium\net\http\Response'));
-		$this->assertTrue($response instanceof Response);
+	public function testSendWithNull() {
+		$stream = new Context($this->_testConfig);
+		$this->assertTrue(is_resource($stream->open()));
+		$result = $stream->send(
+			new Request($this->_testConfig),
+			array('response' => 'lithium\net\http\Response')
+		);
+		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertPattern("/^HTTP/", (string) $result);
+		$this->assertTrue($stream->eof());
+	}
 
-		$this->assertEqual(trim(file_get_contents($this->_testUrl)), trim($response->body()));
+	public function testSendWithArray() {
+		$stream = new Context($this->_testConfig);
+		$this->assertTrue(is_resource($stream->open()));
+		$result = $stream->send($this->_testConfig,
+			array('response' => 'lithium\net\http\Response')
+		);
+		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertPattern("/^HTTP/", (string) $result);
+		$this->assertTrue($stream->eof());
+	}
+
+	public function testSendWithObject() {
+		$stream = new Context($this->_testConfig);
+		$this->assertTrue(is_resource($stream->open()));
+		$result = $stream->send(
+			new Request($this->_testConfig),
+			array('response' => 'lithium\net\http\Response')
+		);
+		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertPattern("/^HTTP/", (string) $result);
 		$this->assertTrue($stream->eof());
 	}
 }

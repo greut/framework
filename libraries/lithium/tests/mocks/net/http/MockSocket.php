@@ -2,7 +2,7 @@
 /**
  * Lithium: the most rad php framework
  *
- * @copyright     Copyright 2010, Union of RAD (http://union-of-rad.org)
+ * @copyright     Copyright 2011, Union of RAD (http://union-of-rad.org)
  * @license       http://opensource.org/licenses/bsd-license.php The BSD License
  */
 
@@ -32,28 +32,15 @@ class MockSocket extends \lithium\net\Socket {
 	}
 
 	public function read() {
-		if (is_object($this->data)) {
-			$data = "HTTP/1.1 200 OK\r\n" .
-				join("\r\n", $this->data->headers()) .
-				"\r\n\r\n" .
-				$this->data->body();
-		}
-		return $data;
+		return $this->data;
 	}
 
 	public function write($data) {
+		if (!is_object($data)) {
+			$data = $this->_instance($this->_classes['request'], (array) $data + $this->_config);
+		}
 		$this->data = $data;
 		return true;
-	}
-
-	public function send($message, array $options = array()) {
-		$defaults = array('response' => $this->_classes['response']);
-		$options += $defaults;
-
-		if ($this->write($message)) {
-			$body = $this->read();
-			return new $options['response'](compact('message'));
-		}
 	}
 
 	public function timeout($time) {

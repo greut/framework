@@ -2,7 +2,7 @@
 /**
  * Lithium: the most rad php framework
  *
- * @copyright     Copyright 2010, Union of RAD (http://union-of-rad.org)
+ * @copyright     Copyright 2011, Union of RAD (http://union-of-rad.org)
  * @license       http://opensource.org/licenses/bsd-license.php The BSD License
  */
 
@@ -18,7 +18,8 @@ class CurlTest extends \lithium\test\Unit {
 		'scheme' => 'http',
 		'host' => 'localhost',
 		'port' => 80,
-		'timeout' => 2
+		'timeout' => 2,
+		'classes' => array('request' => 'lithium\net\http\Request')
 	);
 
 	protected $_testUrl = 'http://localhost';
@@ -31,6 +32,11 @@ class CurlTest extends \lithium\test\Unit {
 	public function skip() {
 		$message = 'Your PHP installation was not compiled with curl support.';
 		$this->skipIf(!function_exists('curl_init'), $message);
+
+		$config = $this->_testConfig;
+		$url = "{$config['scheme']}://{$config['host']}";
+		$message = "Could not open {$url} - skipping " . __CLASS__;
+		$this->skipIf(!curl_init($url), $message);
 	}
 
 	public function testAllMethodsNoConnection() {
@@ -89,14 +95,40 @@ class CurlTest extends \lithium\test\Unit {
 		$stream = new Curl($this->_testConfig);
 		$this->assertTrue(is_resource($stream->open()));
 		$this->assertTrue(is_resource($stream->resource()));
+		$this->assertEqual(1, $stream->write());
+		$this->assertPattern("/^HTTP/", (string) $stream->read());
+	}
 
-		$stream->set(CURLOPT_URL, $this->_testUrl);
-		$this->assertTrue($stream->write(null));
-		$this->assertTrue($stream->read());
+	public function testSendWithNull() {
+		$stream = new Curl($this->_testConfig);
+		$this->assertTrue(is_resource($stream->open()));
+		$result = $stream->send(
+			new Request($this->_testConfig),
+			array('response' => 'lithium\net\http\Response')
+		);
+		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertPattern("/^HTTP/", (string) $result);
+	}
 
-		$response = $stream->send(new Request(), array('response' => 'lithium\net\http\Response'));
-		$this->assertEqual(trim(file_get_contents($this->_testUrl)), trim($response->body()));
-		$this->assertNull($stream->eof());
+	public function testSendWithArray() {
+		$stream = new Curl($this->_testConfig);
+		$this->assertTrue(is_resource($stream->open()));
+		$result = $stream->send($this->_testConfig,
+			array('response' => 'lithium\net\http\Response')
+		);
+		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertPattern("/^HTTP/", (string) $result);
+	}
+
+	public function testSendWithObject() {
+		$stream = new Curl($this->_testConfig);
+		$this->assertTrue(is_resource($stream->open()));
+		$result = $stream->send(
+			new Request($this->_testConfig),
+			array('response' => 'lithium\net\http\Response')
+		);
+		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertPattern("/^HTTP/", (string) $result);
 	}
 }
 

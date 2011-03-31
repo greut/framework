@@ -2,7 +2,7 @@
 /**
  * Lithium: the most rad php framework
  *
- * @copyright     Copyright 2010, Union of RAD (http://union-of-rad.org)
+ * @copyright     Copyright 2011, Union of RAD (http://union-of-rad.org)
  * @license       http://opensource.org/licenses/bsd-license.php The BSD License
  */
 
@@ -34,6 +34,11 @@ class Curl extends \lithium\net\Socket {
 	 */
 	public $options = array();
 
+	/**
+	 * Constructor
+	 *
+	 * @param array $config
+	 */
 	public function __construct(array $config = array()) {
 		$defaults = array('ignoreExpect' => true);
 		parent::__construct($config + $defaults);
@@ -108,25 +113,36 @@ class Curl extends \lithium\net\Socket {
 		if (!is_resource($this->_resource)) {
 			return false;
 		}
-		curl_setopt_array($this->_resource, $this->options);
 		return curl_exec($this->_resource);
 	}
 
 	/**
-	 * Reads data from the curl connection.
-	 * The `read` method will utilize the curl options that have been set.
+	 * Writes data to curl options
 	 *
-	 * @link http://php.net/manual/en/function.curl-exec.php PHP Manual: curl_exec()
-	 * @param array $data
-	 * @return mixed Boolean `false` if the resource handle is unavailable, and the result
-	 *         of `curl_exec()` otherwise.
+	 * @param object $data a `lithium\net\Message` object or array
+	 * @return boolean
 	 */
-	public function write($data) {
+	public function write($data = null) {
 		if (!is_resource($this->_resource)) {
 			return false;
 		}
-		curl_setopt_array($this->_resource, $this->options);
-		return curl_exec($this->_resource);
+		if (!is_object($data)) {
+			$data = $this->_instance($this->_classes['request'], (array) $data + $this->_config);
+		}
+		$this->set(CURLOPT_URL, $data->to('url'));
+
+		if (is_a($data, 'lithium\net\http\Message')) {
+			if (!empty($this->_config['ignoreExpect'])) {
+				$data->headers('Expect', ' ');
+			}
+			if (isset($data->headers)) {
+				$this->set(CURLOPT_HTTPHEADER, $data->headers());
+			}
+			if (isset($data->method) && $data->method == 'POST') {
+				$this->set(array(CURLOPT_POST => true, CURLOPT_POSTFIELDS => $data->body()));
+			}
+		}
+		return (boolean) curl_setopt_array($this->_resource, $this->options);
 	}
 
 	/**
@@ -153,9 +169,7 @@ class Curl extends \lithium\net\Socket {
 	 * @todo implement Curl::encoding($charset)
 	 * @param string $charset
 	 */
-	public function encoding($charset) {
-	}
-
+	public function encoding($charset) {}
 	/**
 	 * Sets the options to be used in subsequent curl requests.
 	 *
@@ -172,34 +186,6 @@ class Curl extends \lithium\net\Socket {
 			$flags = array($flags => $value);
 		}
 		$this->options += $flags;
-	}
-
-	/**
-	 * Aggregates read and write methods into a coherent request response
-	 *
-	 * @param mixed $message a request object based on `\lithium\net\Message`
-	 * @param array $options
-	 *              - '`response`': a fully-namespaced string for the response object
-	 * @return object a response object based on `\lithium\net\Message`
-	 */
-	public function send($message, array $options = array()) {
-		$defaults = array('response' => $this->_classes['response']);
-		$options += $defaults;
-		$this->set(CURLOPT_URL, $message->to('url'));
-
-		if ($this->_config['ignoreExpect']) {
-			$message->headers('Expect', ' ');
-		}
-		if (isset($message->headers)) {
-			$this->set(CURLOPT_HTTPHEADER, $message->headers());
-		}
-		if (isset($message->method) && $message->method == 'POST') {
-			$this->set(array(CURLOPT_POST => true, CURLOPT_POSTFIELDS => $message->body()));
-		}
-		if ($message = $this->write($message)) {
-			$message = $message ?: $this->read();
-			return $this->_instance($options['response'], compact('message'));
-		}
 	}
 }
 
