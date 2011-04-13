@@ -9,6 +9,7 @@
 namespace lithium\tests\cases\net\socket;
 
 use lithium\net\http\Request;
+use lithium\net\http\Response;
 use lithium\net\socket\Stream;
 
 class StreamTest extends \lithium\test\Unit {
@@ -16,7 +17,7 @@ class StreamTest extends \lithium\test\Unit {
 	protected $_testConfig = array(
 		'persistent' => false,
 		'scheme' => 'http',
-		'host' => 'localhost',
+		'host' => 'example.org',
 		'port' => 80,
 		'timeout' => 2,
 		'classes' => array('request' => 'lithium\net\http\Request')
@@ -87,7 +88,9 @@ class StreamTest extends \lithium\test\Unit {
 		$stream = new Stream($this->_testConfig);
 		$this->assertTrue(is_resource($stream->open()));
 		$this->assertTrue(is_resource($stream->resource()));
-		$this->assertEqual(82, $stream->write());
+
+		$result = $stream->write();
+		$this->assertTrue($result == 82 || $result == 84);
 		$this->assertPattern("/^HTTP/", (string) $stream->read());
 	}
 
@@ -98,7 +101,7 @@ class StreamTest extends \lithium\test\Unit {
 			new Request($this->_testConfig),
 			array('response' => 'lithium\net\http\Response')
 		);
-		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertTrue($result instanceof Response);
 		$this->assertPattern("/^HTTP/", (string) $result);
 		$this->assertTrue($stream->eof());
 	}
@@ -109,7 +112,7 @@ class StreamTest extends \lithium\test\Unit {
 		$result = $stream->send($this->_testConfig,
 			array('response' => 'lithium\net\http\Response')
 		);
-		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertTrue($result instanceof Response);
 		$this->assertPattern("/^HTTP/", (string) $result);
 		$this->assertTrue($stream->eof());
 	}
@@ -121,7 +124,7 @@ class StreamTest extends \lithium\test\Unit {
 			new Request($this->_testConfig),
 			array('response' => 'lithium\net\http\Response')
 		);
-		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertTrue($result instanceof Response);
 		$this->assertPattern("/^HTTP/", (string) $result);
 		$this->assertTrue($stream->eof());
 	}

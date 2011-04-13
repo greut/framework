@@ -767,7 +767,7 @@ class Model extends \lithium\core\StaticObject {
 		};
 
 		if (!$options['callbacks']) {
-			return $filter($entity, $params);
+			return $filter(get_called_class(), $params);
 		}
 		return static::_filter(__FUNCTION__, $params, $filter);
 	}
@@ -1031,7 +1031,7 @@ class Model extends \lithium\core\StaticObject {
 	 */
 	protected static function _findFilters() {
 		$self = static::_object();
-		$_query =& $self->_query;
+		$_query = $self->_query;
 
 		return array(
 			'first' => function($self, $params, $chain) {

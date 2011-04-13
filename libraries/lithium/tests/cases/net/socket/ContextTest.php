@@ -9,6 +9,7 @@
 namespace lithium\tests\cases\net\socket;
 
 use lithium\net\http\Request;
+use lithium\net\http\Response;
 use lithium\net\socket\Context;
 
 class ContextTest extends \lithium\test\Unit {
@@ -16,17 +17,21 @@ class ContextTest extends \lithium\test\Unit {
 	protected $_testConfig = array(
 		'persistent' => false,
 		'scheme' => 'http',
-		'host' => 'localhost',
+		'host' => 'example.org',
 		'port' => 80,
-		'timeout' => 30,
+		'timeout' => 4,
 		'classes' => array('request' => 'lithium\net\http\Request')
 	);
 
-	public function skip() {
-		$config = $this->_testConfig;
-		$url = "{$config['scheme']}://{$config['host']}";
-		$message = "Could not open {$url} - skipping " . __CLASS__;
-		$this->skipIf(!fopen($url, 'r'), $message);
+	protected $_testUrl = 'http://example.org';
+
+	public function setUp() {
+		$this->socket = new Context($this->_testConfig);
+		$this->skipIf(!$this->_canConnect('example.org', 80), 'Cannot connect to example.org:80');
+	}
+
+	public function tearDown() {
+		unset($this->socket);
 	}
 
 	public function testConstruct() {
@@ -36,15 +41,14 @@ class ContextTest extends \lithium\test\Unit {
 	}
 
 	public function testGetSetTimeout() {
-		$stream = new Context($this->_testConfig);
-		$this->assertEqual(30, $stream->timeout());
-		$this->assertEqual(25, $stream->timeout(25));
-		$this->assertEqual(25, $stream->timeout());
+		$this->assertEqual(4, $this->socket->timeout());
+		$this->assertEqual(25, $this->socket->timeout(25));
+		$this->assertEqual(25, $this->socket->timeout());
 
-		$stream->open();
-		$this->assertEqual(25, $stream->timeout());
+		$this->socket->open();
+		$this->assertEqual(25, $this->socket->timeout());
 
-		$result = stream_context_get_options($stream->resource());
+		$result = stream_context_get_options($this->socket->resource());
 		$this->assertEqual(25, $result['http']['timeout']);
 	}
 
@@ -88,7 +92,7 @@ class ContextTest extends \lithium\test\Unit {
 			new Request($this->_testConfig),
 			array('response' => 'lithium\net\http\Response')
 		);
-		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertTrue($result instanceof Response);
 		$this->assertPattern("/^HTTP/", (string) $result);
 		$this->assertTrue($stream->eof());
 	}
@@ -99,7 +103,7 @@ class ContextTest extends \lithium\test\Unit {
 		$result = $stream->send($this->_testConfig,
 			array('response' => 'lithium\net\http\Response')
 		);
-		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertTrue($result instanceof Response);
 		$this->assertPattern("/^HTTP/", (string) $result);
 		$this->assertTrue($stream->eof());
 	}
@@ -111,9 +115,23 @@ class ContextTest extends \lithium\test\Unit {
 			new Request($this->_testConfig),
 			array('response' => 'lithium\net\http\Response')
 		);
-		$this->assertTrue($result instanceof \lithium\net\http\Response);
+		$this->assertTrue($result instanceof Response);
 		$this->assertPattern("/^HTTP/", (string) $result);
 		$this->assertTrue($stream->eof());
+	}
+
+	protected function _canConnect($host, $port) {
+		$this->expectException();
+		$this->expectException();
+
+		if ($conn = fsockopen($host, $port)) {
+			array_pop($this->_expected);
+			array_pop($this->_expected);
+			fclose($conn);
+
+			return true;
+		}
+		return false;
 	}
 }
 

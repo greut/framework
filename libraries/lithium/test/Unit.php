@@ -107,8 +107,7 @@ class Unit extends \lithium\core\Object {
 	 *
 	 * @return void
 	 */
-	public function skip() {
-	}
+	public function skip() {}
 
 	/**
 	 * Skips test(s) if the condition is met.
@@ -126,7 +125,7 @@ class Unit extends \lithium\core\Object {
 			return;
 		}
 		$trace = Debugger::trace(array('start' => 2, 'depth' => 3, 'format' => 'array'));
-		throw new Exception(String::insert($message, $trace));
+		throw new Exception(String::insert($message, array_pop($trace)));
 	}
 
 	/**
