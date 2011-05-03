@@ -44,11 +44,6 @@ class Controller extends \lithium\core\Object {
 			if ($group === "all") {
 				$group = Group::all();
 				$options['title'] = 'All Tests';
-				// Remove lithium and li3 from the tests
-				$group = array_filter($group, function($test) {
-				    return (strpos($test, "lithium") !== 0 &&
-					    strpos($test, "li3") !== 0);
-				});
 			}
 			$report = Dispatcher::run($group, $options);
 			$filters = Libraries::locate('test.filter');
@@ -56,11 +51,6 @@ class Controller extends \lithium\core\Object {
 				'filter' => '/cases|integration|functional/',
 				'exclude' => '/mocks/'
 			));
-			// Remove lithium and li3 from the menu
-			$menu = array_filter($menu, function($test) {
-			    return (strpos($test, "lithium") !== 0 &&
-				     strpos($test, "li3") !== 0);
-			});
 			sort($menu);
 
 			$result = compact('request', 'report', 'filters', 'menu');
