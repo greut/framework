@@ -4,7 +4,6 @@ namespace lithium\tests\cases\console\command;
 
 use lithium\console\command\Help;
 use lithium\console\Request;
-use lithium\tests\mocks\console\command\MockCommandHelp;
 
 class HelpTest extends \lithium\test\Unit {
 
@@ -31,7 +30,7 @@ class HelpTest extends \lithium\test\Unit {
 		$command = new Help(array('request' => $this->request, 'classes' => $this->classes));
 		$this->assertTrue($command->run());
 
-		$expected = "COMMANDS\n";
+		$expected = "COMMANDS via lithium\n";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);
@@ -49,12 +48,11 @@ class HelpTest extends \lithium\test\Unit {
 		$result = $command->run('Test');
 		$this->assertTrue($result);
 
-		$expected = "li3 test --case=CASE --group=GROUP --filters=FILTERS [ARGS]";
-		$expected = preg_quote($expected);
+		$expected = "li3 test [--case=<string>] [--group=<string>] [--filters=<string>]";
 		$result = $command->response->output;
-		$this->assertPattern("/{$expected}/", $result);
+		$this->assertTrue(strpos($result, $expected) !== false);
 
-		$expected = "OPTIONS\n    --case=CASE\n";
+		$expected = "OPTIONS\n    missing\n";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);
@@ -85,7 +83,7 @@ class HelpTest extends \lithium\test\Unit {
 		$result = $command->api('lithium.util.Inflector', 'method');
 		$this->assertNull($result);
 
-		$expected = "rules [type] [config]";
+		$expected = "rules";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);
@@ -98,7 +96,7 @@ class HelpTest extends \lithium\test\Unit {
 		$result = $command->api('lithium.util.Inflector', 'method', 'rules');
 		$this->assertNull($result);
 
-		$expected = "rules [type] [config]";
+		$expected = "rules";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);
@@ -111,7 +109,7 @@ class HelpTest extends \lithium\test\Unit {
 		$result = $command->api('lithium.net.Message', 'property');
 		$this->assertNull($result);
 
-		$expected = "    --host=HOST\n        The hostname for this endpoint.";
+		$expected = "    --host=<string>\n        The hostname for this endpoint.";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);
@@ -124,10 +122,23 @@ class HelpTest extends \lithium\test\Unit {
 		$result = $command->api('lithium.net.Message', 'property');
 		$this->assertNull($result);
 
-		$expected = "    --host=HOST\n        The hostname for this endpoint.";
+		$expected = "    --host=<string>\n        The hostname for this endpoint.";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);
+	}
+
+	public function testApiProperties() {
+		$help = new Help(array(
+			'request' => $this->request, 'classes' => $this->classes
+		));
+		$expected = null;
+		$result = $help->api('lithium.tests.mocks.console.command.MockCommandHelp', 'property');
+		$this->assertEqual($expected, $result);
+
+		$expected = "\-\-long=<string>.*\-\-blong.*\-s";
+		$result = $help->response->output;
+		$this->assertPattern("/{$expected}/s", $result);
 	}
 }
 

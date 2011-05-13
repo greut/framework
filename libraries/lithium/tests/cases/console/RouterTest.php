@@ -24,7 +24,7 @@ class RouterTest extends \lithium\test\Unit {
 		$_SERVER = $this->_backup;
 	}
 
-	public function testParseNoOptions() {
+	public function testParseNoArgumentsNoOptions() {
 		$expected = array(
 			'command' => null, 'action' => 'run', 'args' => array()
 		);
@@ -32,7 +32,7 @@ class RouterTest extends \lithium\test\Unit {
 		$this->assertEqual($expected, $result);
 	}
 
-	public function testParseWithPassed() {
+	public function testParseArguments() {
 		$expected = array(
 			'command' => 'test', 'action' => 'action',
 			'args' => array('param')
@@ -43,21 +43,7 @@ class RouterTest extends \lithium\test\Unit {
 		$this->assertEqual($expected, $result);
 	}
 
-	public function testParseWithNamed() {
-		$expected = array(
-			'command' => 'test', 'action' => 'lithium.tests.cases.console.RouterTest',
-			'args' => array(),
-			'case' => true
-		);
-		$result = Router::parse(new Request(array(
-			'args' => array(
-				'test', '-case', 'lithium.tests.cases.console.RouterTest'
-			)
-		)));
-		$this->assertEqual($expected, $result);
-	}
-
-	public function testParseWithDoubleNamed() {
+	public function testParseGnuStyleLongOptions() {
 		$expected = array(
 			'command' => 'test', 'action' => 'run', 'args' => array(),
 			'case' => 'lithium.tests.cases.console.RouterTest'
@@ -85,10 +71,10 @@ class RouterTest extends \lithium\test\Unit {
 		$this->assertEqual($expected, $result);
 	}
 
-	public function testParseWithParam() {
+	public function testParseShortOption() {
 		$expected = array(
 			'command' => 'test', 'action' => 'action', 'args' => array(),
-			'i' => true,
+			'i' => true
 		);
 		$result = Router::parse(new Request(array(
 			'args' => array('test', 'action', '-i')
@@ -97,10 +83,41 @@ class RouterTest extends \lithium\test\Unit {
 
 		$expected = array(
 			'command' => 'test', 'action' => 'action', 'args' => array('something'),
-			'i' => true,
+			'i' => true
 		);
 		$result = Router::parse(new Request(array(
 			'args' => array('test', 'action', '-i', 'something')
+		)));
+		$this->assertEqual($expected, $result);
+	}
+
+	public function testParseShortOptionAsFirst() {
+		$expected = array(
+			'command' => 'test', 'action' => 'action', 'args' => array(),
+			'i' => true
+		);
+		$result = Router::parse(new Request(array(
+			'args' => array('-i', 'test', 'action')
+		)));
+		$this->assertEqual($expected, $result);
+
+		$expected = array(
+			'command' => 'test', 'action' => 'action', 'args' => array('something'),
+			'i' => true
+		);
+		$result = Router::parse(new Request(array(
+			'args' => array('-i', 'test', 'action', 'something')
+		)));
+		$this->assertEqual($expected, $result);
+	}
+
+	public function testParseGnuStyleLongOptionAsFirst() {
+		$expected = array(
+			'command' => 'test', 'action' => 'action', 'long' => 'something', 'i' => true,
+			'args' => array()
+		);
+		$result = Router::parse(new Request(array(
+			'args' => array('--long=something', 'test', 'action', '-i')
 		)));
 		$this->assertEqual($expected, $result);
 	}
