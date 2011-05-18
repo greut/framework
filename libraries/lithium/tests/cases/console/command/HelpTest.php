@@ -9,6 +9,8 @@ class HelpTest extends \lithium\test\Unit {
 
 	public $request;
 
+	public $classes = array();
+
 	protected $_backup = array();
 
 	public function setUp() {
@@ -48,16 +50,17 @@ class HelpTest extends \lithium\test\Unit {
 		$result = $command->run('Test');
 		$this->assertTrue($result);
 
-		$expected = "li3 test [--case=<string>] [--group=<string>] [--filters=<string>]";
-		$result = $command->response->output;
-		$this->assertTrue(strpos($result, $expected) !== false);
-
-		$expected = "OPTIONS\n    missing\n";
+		$expected = "li3 test [--filters=<string>] [--format=<string>] [<path>]";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);
 
-		$expected = "missing\n";
+		$expected = "OPTIONS\n    <path>\n";
+		$expected = preg_quote($expected);
+		$result = $command->response->output;
+		$this->assertPattern("/{$expected}/", $result);
+
+		$expected = "DESCRIPTION\n";
 		$expected = preg_quote($expected);
 		$result = $command->response->output;
 		$this->assertPattern("/{$expected}/", $result);

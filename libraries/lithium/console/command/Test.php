@@ -9,88 +9,92 @@
 namespace lithium\console\command;
 
 use lithium\core\Libraries;
-use lithium\test\Group;
 use lithium\test\Dispatcher;
 
 /**
  * Runs a given set of tests and outputs the results.
+ *
+ * @see lithium\test
  */
 class Test extends \lithium\console\Command {
-
-	/**
-	 * Path to the test case in dot notation.
-	 *
-	 * For example:
-	 * {{{
-	 * lithium test --case=console.CommandTest
-	 * }}}
-	 *
-	 * @var string
-	 */
-	public $case = null;
-
-	/**
-	 * Path to test group in dot notation.
-	 *
-	 * For example:
-	 * {{{
-	 * lithium test --group=lithium.tests.cases.console
-	 * }}}
-	 *
-	 * @var string
-	 */
-	public $group = null;
 
 	/**
 	 * Filters.
 	 *
 	 * For example:
 	 * {{{
-	 * lithium test --case=lithium.tests.cases.core.ObjectTest --filters=Coverage
+	 * lithium test lithium/tests/cases/core/ObjectTest.php --filters=Coverage
+	 * lithium test lithium/tests/cases/core/ObjectTest.php --filters=Coverage,Profiler
 	 * }}}
 	 *
-	 * @var string
+	 * @var string Name of a filter or a comma separated list of filter names. Builtin filters:
+	 *      - `Affected`:   Adds tests to the run affected by the classes covered by current tests.
+	 *      - `Complexity`: Calculates the cyclomatic complexity of class methods, and shows
+	 *                      worst-offenders and statistics.
+	 *      - `Coverage`:   Runs code coverage analysis for the executed tests.
+	 *      - `Profiler`:   Tracks timing and memory usage information for each test method.
 	 */
-	public $filters = array();
+	public $filters;
 
 	/**
-	 * Runs tests. Will provide a list of available tests if none are given.
-	 * Test cases should be given in dot notation.
+	 * Format to use for rendering results. Any other format than `txt` will
+	 * cause the command to enter quiet mode, surpressing headers and any other
+	 * decoration.
 	 *
-	 * Case example:
-	 * {{{
-	 * lithium test --case=lithium.tests.cases.core.ObjectTest
-	 * }}}
+	 * @var string Either `txt` or `json`.
+	 */
+	public $format = 'txt';
+
+	/**
+	 * Runs tests given a path to a directory or file containing tests. The path to the
+	 * test(s) may be absolte or relative to the current working directory.
 	 *
-	 * Group example:
 	 * {{{
-	 * lithium test --group=lithium.tests.cases.core
+	 * lithium test lithium/tests/cases/core/ObjectTest.php
+	 * lithium test lithium/tests/cases/core
 	 * }}}
 	 *
 	 * @param string $path Absolute or relative path to tests.
 	 * @return boolean Will exit with status `1` if one or more tests failed otherwise with `0`.
 	 */
-	public function run() {
-		$this->header('Test');
+	public function run($path = null) {
+		$path = str_replace('\\', '/', $path);
 
-		if ($this->_getTests() != true) {
-			return 0;
+		if (!$path) {
+			$this->error('Please provide a path to tests.');
+			return false;
+		}
+		if ($path[0] != '/') {
+			$path = $this->request->env('working') . '/' . $path;
+		}
+		if (!$path = realpath($path)) {
+			$this->error('Not a valid path.');
+			return false;
+		}
+		$filters = $this->filters ? array_map('trim', explode(',', $this->filters)) : array();
+
+		if (!$libraryPath = $this->_library($path)) {
+			$this->error("No library registered for path `{$path}`.");
+			return false;
+		}
+		$path = $libraryPath;
+
+		if ($this->format == 'txt') {
+			$this->header('Test');
+			$this->out(sprintf('Running test(s) in `%s`... ', $path), array('nl' => false));
 		}
 		error_reporting(E_ALL | E_STRICT | E_DEPRECATED);
 
-		$run = $this->case ?: $this->group;
-		$run = '\\' . str_replace('.', '\\', $run);
-		$this->out(sprintf('Running `%s`... ', $run), false);
-
-		$report = Dispatcher::run($run, array(
-			'filters' => $this->filters,
+		$report = Dispatcher::run($path, compact('filters') + array(
 			'reporter' => 'console',
-			'format' => 'txt'
+			'format' => $this->format
 		));
 		$stats = $report->stats();
 
-		$this->out('done.', 2);
-		$this->out('{:heading}Results{:end}', 0);
+		if ($this->format == 'txt') {
+			$this->out('done.', 2);
+			$this->out('{:heading}Results{:end}', 0);
+		}
 		$this->out($report->render('stats', $stats));
 
 		foreach ($report->filters() as $filter => $options) {
@@ -98,74 +102,26 @@ class Test extends \lithium\console\Command {
 			$this->out($report->render($options['name'], compact('data')));
 		}
 
-		$this->hr();
-		$this->nl();
-
+		if ($this->format == 'txt') {
+			$this->hr();
+			$this->nl();
+		}
 		return $stats['success'];
 	}
 
 	/**
-	 * Shows which classes are un-tested.
+	 * Finds a library for given path.
 	 *
-	 * @return void
+	 * @param string $path Normalized (to slashes) absolute or relative path.
+	 * @return string|void The library's path on success.
 	 */
-	public function missing() {
-		$this->header('Classes with no test case');
-
-		$classes = Libraries::find(true, array(
-			'recursive' => true,
-			'exclude' => '/tests|resources|webroot|index$|^app\\\\config|^app\\\\views/'
-		));
-		$map = function($t) {
-			return str_replace('\tests\cases', '', preg_replace('/Test$/', '', $t));
-		};
-		$tests = array_map($map, Group::all());
-		$classes = array_diff($classes, $tests);
-
-		sort($classes);
-		$this->out($classes);
-	}
-
-	/**
-	 * Show included files.
-	 *
-	 * @return void
-	 */
-	public function included() {
-		$this->header('Included Files');
-		$base = dirname(dirname(dirname(dirname(__DIR__))));
-		$files = str_replace($base, '', get_included_files());
-		sort($files);
-		$this->out($files);
-	}
-
-	/**
-	 * Provide a list of test cases and accept input as case to run.
-	 *
-	 * @return void
-	 */
-	protected function _getTests() {
-		while (empty($this->case) && empty($this->group)) {
-			$tests = Libraries::locate('tests', null, array(
-				'filter' => '/cases|integration|functional/',
-				'exclude' => '/mocks/'
-			));
-			$tests = str_replace('\\', '.', $tests);
-
-			foreach ($tests as $key => $test) {
-				$this->out(++$key . ". " . $test);
-			}
-			$number = $this->in("Choose a test case. (q to quit)");
-
-			if (isset($tests[--$number])) {
-				$this->case = $tests[$number];
-			}
-
-			if ($number === 'q') {
-				return 0;
+	protected function _library($path) {
+		foreach (Libraries::get() as $name => $library) {
+			if (strpos($path, $library['path']) === 0) {
+				$path = str_replace(array($library['path'], '.php'), null, $path);
+				return '\\' . $name . str_replace('/', '\\', $path);
 			}
 		}
-		return 1;
 	}
 }
 
