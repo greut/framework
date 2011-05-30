@@ -434,6 +434,7 @@ class Validator extends \lithium\core\StaticObject {
 		);
 		$errors = array();
 		$events = (array) (isset($options['events']) ? $options['events'] : null);
+		$values = Set::flatten($values);
 
 		foreach ($rules as $field => $rules) {
 			$rules = is_string($rules) ? array('message' => $rules) : $rules;
@@ -544,6 +545,7 @@ class Validator extends \lithium\core\StaticObject {
 	 * @param string $options
 	 * @return boolean Returns `true` or `false` indicating whether the validation rule check
 	 *         succeeded or failed.
+	 * @filter
 	 */
 	public static function rule($rule, $value, $format = 'any', array $options = array()) {
 		if (!isset(static::$_rules[$rule])) {
