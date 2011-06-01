@@ -507,6 +507,8 @@ class RouterTest extends \lithium\test\Unit {
 		$this->assertEqual('/add/baz/dib', $path);
 	}
 
+	public function test
+
 	/**
 	 * Tests that persistent parameters can be overridden with nulled-out values.
 	 *

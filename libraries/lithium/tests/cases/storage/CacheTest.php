@@ -11,6 +11,8 @@ namespace lithium\tests\cases\storage;
 use SplFileInfo;
 use lithium\core\Libraries;
 use lithium\storage\Cache;
+use lithium\storage\cache\adapter\Apc;
+use lithium\storage\cache\adapter\Memcache;
 use lithium\util\Collection;
 
 class CacheTest extends \lithium\test\Unit {
@@ -292,29 +294,37 @@ class CacheTest extends \lithium\test\Unit {
 	}
 
 	public function testCacheReadThroughWrite() {
-		$config = array('default' => array(
-			'adapter' => 'Memory', 'filters' => array()
-		));
-		Cache::config($config);
-		$result = Cache::config();
-		$expected = $config;
-		$this->assertEqual($expected, $result);
+		$adapters = array(
+			'lithium\\storage\\cache\\adapter\\Memory',
+			'lithium\\storage\\cache\\adapter\\Apc',
+			'lithium\\storage\\cache\\adapter\\Memcache',
+		);
+		foreach ($adapters as $adapter) {
+			$this->skipIf(!$adapter::enabled());
+			$config = array('default' => array(
+				'adapter' => $adapter, 'filters' => array(),
+			));
+			Cache::config($config);
+			$result = Cache::config();
+			$expected = $config;
+			$this->assertEqual($expected, $result, $adapter."\n{:message}");
 
-		$write = function() {
-			return array('+1 minute' => 'read-through write');
-		};
-		$result = Cache::read('default', 'read_through', compact('write'));
-		$this->assertEqual('read-through write', $result);
+			$write = function() {
+				return array('+1 minute' => 'read-through write');
+			};
+			$result = Cache::read('default', 'read_through', compact('write'));
+			$this->assertEqual('read-through write', $result, $adapter."\n{:message}");
 
-		$result = Cache::read('default', 'read_through');
-		$this->assertEqual('read-through write', $result);
+			$result = Cache::read('default', 'read_through');
+			$this->assertEqual('read-through write', $result, $adapter."\n{:message}");
 
-		$write = array('+1 minute' => 'string read-through write');
-		$result = Cache::read('default', 'string_read_through', compact('write'));
-		$this->assertEqual('string read-through write', $result);
+			$write = array('+1 minute' => 'string read-through write');
+			$result = Cache::read('default', 'string_read_through', compact('write'));
+			$this->assertEqual('string read-through write', $result, $adapter."\n{:message}");
 
-		$result = Cache::read('default', 'string_read_through');
-		$this->assertEqual('string read-through write', $result);
+			$result = Cache::read('default', 'string_read_through');
+			$this->assertEqual('string read-through write', $result, $adapter."\n{:message}");
+		}
 	}
 
 	public function testCacheReadAndWrite() {
