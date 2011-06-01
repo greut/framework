@@ -150,7 +150,7 @@ class Cache extends \lithium\core\Adaptable {
 		$filters = $settings[$name]['filters'];
 		$result = static::_filter(__FUNCTION__, $params, $method, $filters);
 
-		if (($result === null || $result === false) && $options['write']) {
+		if ($result === null && $options['write']) {
 			$write = (is_callable($options['write'])) ? $options['write']() : $options['write'];
 			list($expiry, $result) = each($write);
 			static::write($name, $key, $result, $expiry);
