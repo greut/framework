@@ -305,7 +305,7 @@ class Router extends \lithium\core\StaticObject {
 	 * @return array
 	 */
 	protected static function _parseString($path, $context) {
-		if (!preg_match('/^[A-Za-z0-9_]+::[A-Za-z0-9_]+$/', $path)) {
+		if (!preg_match('/^[A-Za-z0-9_]+::[A-Za-z0-9_]*$/', $path)) {
 			$base = $context ? $context->env('base') : '';
 			$path = trim($path, '/');
 			return $context !== false ? "{$base}/{$path}" : null;
