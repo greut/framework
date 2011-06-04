@@ -19,7 +19,7 @@
  * “app”, i.e. via `export LITHIUM_APP=myapp` on UNIX.
  */
 $library = dirname(dirname(__DIR__));
-$working = getcwd() ?: __DIR__;
+$working = getenv('LITHIUM_HOME') ?: getcwd() ?: __DIR__;
 $appname = getenv('LITHIUM_APP') ?: 'app';
 $app = null;
 
@@ -39,7 +39,7 @@ if ($app && is_dir("{$app}/config/bootstrap") && file_exists("{$app}/webroot/ind
 }
 
 define('LITHIUM_LIBRARY_PATH', $library);
-define('LITHIUM_APP_PATH', $app ? $working : dirname($library) . '/app');
+define('LITHIUM_APP_PATH', $app ? $working : dirname($library) . '/' . $appname);
 
 if (!include LITHIUM_LIBRARY_PATH . '/lithium/core/Libraries.php') {
 	$message  = "Lithium core could not be found.  Check the value of LITHIUM_LIBRARY_PATH in ";
