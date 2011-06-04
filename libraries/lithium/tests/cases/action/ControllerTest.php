@@ -8,8 +8,6 @@
 
 namespace lithium\tests\cases\action;
 
-use Exception;
-use lithium\net\http\Media;
 use lithium\action\Request;
 use lithium\action\Controller;
 use lithium\tests\mocks\action\MockPostsController;
@@ -283,6 +281,24 @@ class ControllerTest extends \lithium\test\Unit {
 		$postsController(new Request(), array('action' => 'changeTemplate'));
 		$result = $postsController->access('_render');
 		$this->assertEqual('foo', $result['template']);
+	}
+
+	public function testSetData() {
+		$postController = new MockPostsController();
+
+		$setData = array('foo' => 'bar');
+		$postController->set($setData);
+		$_render = $postController->access('_render');
+		$data = $_render['data'];
+		$expected = $setData;
+		$this->assertEqual($expected, $data);
+
+		$setData = array('foo' => 'baz');
+		$postController->set($setData);
+		$_render = $postController->access('_render');
+		$data = $_render['data'];
+		$expected = $setData;
+		$this->assertEqual($expected, $data);
 	}
 
 	public function testResponseTypeBasedOnRequestHeaderType() {

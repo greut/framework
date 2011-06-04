@@ -202,7 +202,7 @@ class Controller extends \lithium\core\Object {
 	 * @return void
 	 */
 	public function set($data = array()) {
-		$this->_render['data'] += (array) $data;
+		$this->_render['data'] = (array) $data + $this->_render['data'];
 	}
 
 	/**
@@ -240,7 +240,7 @@ class Controller extends \lithium\core\Object {
 			'location'   => false,
 			'data'       => null,
 			'head'       => false,
-			'controller' => Inflector::underscore($name),
+			'controller' => Inflector::underscore($name)
 		);
 		$options += $this->_render + $defaults;
 

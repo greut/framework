@@ -11,7 +11,6 @@ namespace lithium\tests\cases\data\source;
 use lithium\data\Connections;
 use lithium\data\model\Query;
 use lithium\data\entity\Record;
-use lithium\data\source\Database;
 use lithium\data\collection\RecordSet;
 use lithium\tests\mocks\data\model\MockDatabase;
 use lithium\tests\mocks\data\model\MockDatabasePost;
@@ -184,7 +183,7 @@ class DatabaseTest extends \lithium\test\Unit {
 				'type' => 'read',
 				'fields' => array('post_id'),
 				'model' => 'lithium\tests\mocks\data\model\MockDatabaseTagging',
-				'conditions' => array('MockDatabaseTag.tag' => array('foo', 'bar', 'baz')),
+				'conditions' => array('MockDatabaseTag.tag' => array('foo', 'bar', 'baz'))
 			)))
 		));
 		$result = $this->db->renderCommand($query);
@@ -231,7 +230,7 @@ class DatabaseTest extends \lithium\test\Unit {
 		));
 		$query = new Query(compact('entity') + array(
 			'type' => 'create',
-			'model' => $this->_model,
+			'model' => $this->_model
 		));
 		$hash = $query->export($this->db);
 		ksort($hash);
@@ -280,7 +279,7 @@ class DatabaseTest extends \lithium\test\Unit {
 	public function testReadWithQueryObjectRecordSet() {
 		$query = new Query(array(
 			'type' => 'read',
-			'model' => 'lithium\tests\mocks\data\model\MockDatabasePost',
+			'model' => 'lithium\tests\mocks\data\model\MockDatabasePost'
 		));
 		$result = $this->db->read($query);
 		$this->assertTrue($result instanceof RecordSet);
@@ -293,7 +292,7 @@ class DatabaseTest extends \lithium\test\Unit {
 	public function testReadWithQueryObjectArray() {
 		$query = new Query(array(
 			'type' => 'read',
-			'model' => 'lithium\tests\mocks\data\model\MockDatabasePost',
+			'model' => 'lithium\tests\mocks\data\model\MockDatabasePost'
 		));
 		$result = $this->db->read($query, array('return' => 'array'));
 		$this->assertTrue(is_array($result));

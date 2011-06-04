@@ -8,8 +8,6 @@
 
 namespace lithium\data;
 
-use Exception;
-use lithium\util\String;
 use lithium\core\Libraries;
 
 /**
@@ -105,7 +103,7 @@ class Connections extends \lithium\core\Adaptable {
 			'adapter'  => null,
 			'host'     => 'localhost',
 			'login'    => '',
-			'password' => '',
+			'password' => ''
 		);
 		return static::$_configurations[$name] = $config + $defaults;
 	}

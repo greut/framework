@@ -9,29 +9,9 @@
 namespace lithium\tests\cases\util;
 
 use lithium\util\String;
-use lithium\net\http\Request;
 use lithium\tests\mocks\util\MockStringObject;
 
 class StringTest extends \lithium\test\Unit {
-	/**
-	 * testRandomGenerator method
-	 *
-	 * @return void
-	 */
-	public function testRandomGenerator() {
-		// Disallow allow seeding twice
-		$this->assertFalse(String::seed() && String::seed());
-
-		$check = array();
-		$count = 50;
-		$pattern = "/^[0-9A-Za-z\.\/]+$/";
-		for ($i = 0; $i < $count; $i++) {
-			$result = String::random(8);
-			$this->assertPattern($pattern, String::encode64($result));
-			$this->assertFalse(in_array($result, $check));
-			$check[] = $result;
-		}
-	}
 
 	/**
 	 * testUuidGeneration method
@@ -63,80 +43,6 @@ class StringTest extends \lithium\test\Unit {
 			$this->assertTrue($match);
 			$this->assertFalse(in_array($result, $check));
 			$check[] = $result;
-		}
-	}
-
-	/**
-	 * testHash method - Tests hash generation using `util\String::hash()`
-	 *
-	 * @return void
-	 */
-	public function testHash() {
-		$string = 'Hash Me';
-		$key = 'a very valid key';
-		$salt = 'not too much';
-		$type = 'sha256';
-
-		$expected = '24f8664f7a7e56f85bd5c983634aaa0b0d3b0e470d7f63494475729cb8b3c6a4ef28398d7cf3';
-		$expected .= '780c0caec26c85b56a409920e4af7eef38597861d49fbe31b9a0';
-
-		$result = String::hash($string, compact('key'));
-		$this->assertEqual($expected, $result);
-
-		$expected = '35bc1d9a3332e524962909b7ccff6b34ae143f64c48ffa32b5be9312719a96369fbd7ebf6f49';
-		$expected .= '09b375135b34e28b063a07b5bd62af165483c6b80dd48a252ddd';
-
-		$result = String::hash($string, compact('salt'));
-		$this->assertEqual($expected, $result);
-
-		$expected = 'fa4cfa5c16d7f94e221e1d3a0cb01eadfd6823d68497a5fdcae023d24f557e4a';
-		$result = String::hash($string, compact('type', 'key'));
-		$this->assertEqual($expected, $result);
-
-		$expected = 'a9050b4f44797bf60262de984ca12967711389cd6c4c4aeee2a739c159f1f667';
-		$result = String::hash($string, compact('type'));
-		$this->assertEqual($expected, $result);
-	}
-
-	/**
-	 * testPassword method
-	 *
-	 * @return void
-	 **/
-	public function testPassword() {
-		$pass = 'Lithium rocks!';
-
-		$bfSalt = "{^\\$2a\\$06\\$[0-9A-Za-z./]{22}$}";
-		$bfHash = "{^\\$2a\\$06\\$[0-9A-Za-z./]{53}$}";
-
-		$xdesSalt = "{^_zD..[0-9A-Za-z./]{4}$}";
-		$xdesHash = "{^_zD..[0-9A-Za-z./]{15}$}";
-
-		$md5Salt = "{^\\$1\\$[0-9A-Za-z./]{8}$}";
-		$md5Hash = "{^\\$1\\$[0-9A-Za-z./]{8}\\$[0-9A-Za-z./]{22}$}";
-
-		// Make it a bit slow, else we'll be there tomorrow
-		foreach (array('bf' => 6, 'xdes' => 10, 'md5' => false) as $method => $log2) {
-			$salts = array();
-			$hashes = array();
-			$count = 50;
-			$saltPattern = ${$method . 'Salt'};
-			$hashPattern = ${$method . 'Hash'};
-
-			for ($i = 0; $i < $count; $i++) {
-				$salt = String::genSalt($method, $log2);
-				$this->assertPattern($saltPattern, $salt);
-				$this->assertFalse(in_array($salt, $salts));
-				$salts[] = $salt;
-
-				$hash = String::hashPassword($pass, $salt);
-				$this->assertPattern($hashPattern, $hash);
-				$this->assertEqual(substr($hash, 0, strlen($salt)), $salt);
-				$this->assertFalse(in_array($hash, $hashes));
-				$hashes[] = $hash;
-
-				$this->assertTrue(String::checkPassword($pass, $hash));
-			}
 		}
 	}
 
@@ -436,8 +342,6 @@ class StringTest extends \lithium\test\Unit {
 
 	/**
 	 * Tests the `String::extract()` regex helper method.
-	 *
-	 * @return void
 	 */
 	public function testStringExtraction() {
 		$result = String::extract('/string/', 'whole string');
@@ -454,6 +358,96 @@ class StringTest extends \lithium\test\Unit {
 
 		$result = String::insert('some {:param}string with a ?', array('param' => null));
 		$this->assertEqual('some string with a ?', $result);
+	}
+
+	/**
+	 * Tests the random number generator.
+	 */
+	public function testRandomGenerator() {
+		$check = array();
+		$count = 25;
+		for ($i = 0; $i < $count; $i++) {
+			$result = String::random(8);
+			$this->assertFalse(in_array($result, $check));
+			$check[] = $result;
+		}
+	}
+
+	/**
+	 * Tests the random number generator with base64 encoding.
+	 */
+	public function testRandom64Generator() {
+		$check = array();
+		$count = 25;
+		$pattern = "/^[0-9A-Za-z\.\/]{11}$/";
+		for ($i = 0; $i < $count; $i++) {
+			$result = String::random(8, array('encode' => String::ENCODE_BASE_64));
+			$this->assertPattern($pattern, $result);
+			$this->assertFalse(in_array($result, $check));
+			$check[] = $result;
+		}
+	}
+
+	/**
+	 * Tests hash generation using `String::hash()`.
+	 */
+	public function testHash() {
+		$salt = 'Salt and pepper';
+		$value = 'Lithium rocks!';
+
+		$expected = sha1($value);
+		$result = String::hash($value, array('type' => 'sha1'));
+		$this->assertEqual($expected, $result);
+
+		$result = String::hash($value, array('type' => 'sha1') + compact('salt'));
+		$this->assertEqual(sha1($salt . $value), $result);
+		$this->assertEqual(md5($value), String::hash($value, array('type' => 'md5')));
+
+		$result = String::hash($value, array('type' => 'md5') + compact('salt'));
+		$this->assertEqual(md5($salt . $value), $result);
+
+		$sha256 = function($value) {
+			if (function_exists('mhash')) {
+				return bin2hex(mhash(MHASH_SHA256, $value));
+			} elseif (function_exists('hash')) {
+				return hash('sha256', $value);
+			}
+			throw new Exception();
+		};
+
+		try {
+			$result = String::hash($value, array('type' => 'sha256'));
+			$this->assertEqual($sha256($value), $result);
+
+			$result = String::hash($value, array('type' => 'sha256') + compact('salt'));
+			$this->assertEqual($sha256($salt . $value), $result);
+		} catch (Exception $e) {
+		}
+
+		$string = 'Hash Me';
+		$key = 'a very valid key';
+		$salt = 'not too much';
+		$type = 'sha256';
+
+		$expected = '24f8664f7a7e56f85bd5c983634aaa0b0d3b0e470d7f63494475729cb8b3c6a4ef28398d7cf3';
+		$expected .= '780c0caec26c85b56a409920e4af7eef38597861d49fbe31b9a0';
+
+		$result = String::hash($string, compact('key'));
+		$this->assertEqual($expected, $result);
+
+		$expected = '35bc1d9a3332e524962909b7ccff6b34ae143f64c48ffa32b5be9312719a96369fbd7ebf6f49';
+		$expected .= '09b375135b34e28b063a07b5bd62af165483c6b80dd48a252ddd';
+
+		$result = String::hash($string, compact('salt'));
+		$this->assertEqual($expected, $result);
+
+		$expected = 'fa4cfa5c16d7f94e221e1d3a0cb01eadfd6823d68497a5fdcae023d24f557e4a';
+		$result = String::hash($string, compact('type', 'key'));
+		$this->assertEqual($expected, $result);
+
+		$expected = 'a9050b4f44797bf60262de984ca12967711389cd6c4c4aeee2a739c159f1f667';
+		$result = String::hash($string, compact('type'));
+		$this->assertEqual($expected, $result);
 	}
 }
 

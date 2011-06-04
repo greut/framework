@@ -12,11 +12,9 @@ use lithium\data\Model;
 use lithium\data\Entity;
 use lithium\data\model\Query;
 use lithium\data\Connections;
-use lithium\analysis\Inspector;
 use lithium\data\entity\Record;
 use lithium\tests\mocks\data\MockTag;
 use lithium\tests\mocks\data\MockPost;
-use lithium\tests\mocks\data\MockSource;
 use lithium\tests\mocks\data\MockComment;
 use lithium\tests\mocks\data\MockTagging;
 use lithium\tests\mocks\data\MockCreator;
@@ -99,7 +97,7 @@ class ModelTest extends \lithium\test\Unit {
 			'source'      => 'mock_posts',
 			'connection'  => 'mock-source',
 			'initialized' => true,
-			'locked'      => true,
+			'locked'      => true
 		);
 		MockPost::config();
 		$this->assertEqual($expected, MockPost::meta());
@@ -112,7 +110,7 @@ class ModelTest extends \lithium\test\Unit {
 			'source'     => 'mock_comments',
 			'connection' => 'mock-source',
 			'initialized' => true,
-			'locked'      => true,
+			'locked'      => true
 		);
 		$this->assertEqual($expected, MockComment::meta());
 
@@ -355,7 +353,7 @@ class ModelTest extends \lithium\test\Unit {
 		$validates = array(
 			'title' => 'A custom message here for empty titles.',
 			'email' => array(
-				array('notEmpty', 'message' => 'email is empty.'),
+				array('notEmpty', 'message' => 'email is empty.')
 			)
 		);
 		$post = MockPostForValidates::create(array(

@@ -8,8 +8,6 @@
 
 namespace lithium\data;
 
-use RuntimeException;
-
 /**
  * The `Collection` class extends the generic `lithium\util\Collection` class to provide
  * context-specific features for working with sets of data persisted by a backend data store. This
@@ -216,7 +214,7 @@ abstract class Collection extends \lithium\util\Collection {
 	 */
 	public function each($filter) {
 		if (!$this->closed()) {
-			while($this->next()) {}
+			while ($this->next()) {}
 		}
 		return parent::each($filter);
 	}
@@ -238,7 +236,7 @@ abstract class Collection extends \lithium\util\Collection {
 		$options += $defaults;
 
 		if (!$this->closed()) {
-			while($this->next()) {}
+			while ($this->next()) {}
 		}
 		$data = parent::map($filter, $options);
 

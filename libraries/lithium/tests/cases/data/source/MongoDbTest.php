@@ -14,14 +14,10 @@ use MongoId;
 use MongoCode;
 use MongoDate;
 use MongoRegex;
-use MongoMaxKey;
-use lithium\data\Model;
 use lithium\data\Connections;
 use lithium\data\model\Query;
 use lithium\data\entity\Document;
-use lithium\tests\mocks\data\MockPost;
 use lithium\data\collection\DocumentSet;
-use lithium\data\collection\DocumentArray;
 use lithium\tests\mocks\data\source\MockMongoSource;
 use lithium\tests\mocks\data\source\MockMongoConnection;
 
@@ -53,7 +49,7 @@ class MongoDbTest extends \lithium\test\Unit {
 		'rank' => array('type' => 'float', 'default' => 0.0),
 		'notifications.foo' => array('type' => 'boolean'),
 		'notifications.bar' => array('type' => 'boolean'),
-		'notifications.baz' => array('type' => 'boolean'),
+		'notifications.baz' => array('type' => 'boolean')
 	);
 
 	protected $_configs = array();

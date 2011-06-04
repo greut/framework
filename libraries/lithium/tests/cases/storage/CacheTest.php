@@ -11,8 +11,6 @@ namespace lithium\tests\cases\storage;
 use SplFileInfo;
 use lithium\core\Libraries;
 use lithium\storage\Cache;
-use lithium\storage\cache\adapter\Apc;
-use lithium\storage\cache\adapter\Memcache;
 use lithium\util\Collection;
 
 class CacheTest extends \lithium\test\Unit {

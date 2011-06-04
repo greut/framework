@@ -10,7 +10,6 @@ namespace lithium\g11n;
 
 use lithium\core\Environment;
 use lithium\util\String;
-use lithium\g11n\Locale;
 use lithium\g11n\Catalog;
 
 /**
@@ -101,7 +100,7 @@ class Message extends \lithium\core\StaticObject {
 			'locale' => Environment::get('locale'),
 			'scope' => null,
 			'default' => null,
-			'noop' => false,
+			'noop' => false
 		);
 		extract($options + $defaults);
 

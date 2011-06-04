@@ -8,7 +8,6 @@
 
 namespace lithium\data\collection;
 
-use lithium\data\Source;
 use lithium\util\Collection;
 
 class DocumentArray extends \lithium\data\Collection {
@@ -138,7 +137,7 @@ class DocumentArray extends \lithium\data\Collection {
 		return array(
 			'exists' => $this->_exists,
 			'key'  => $this->_pathKey,
-			'data' => $this->_data,
+			'data' => $this->_data
 		);
 	}
 

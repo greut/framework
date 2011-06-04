@@ -9,7 +9,6 @@
 namespace lithium\data\source;
 
 use lithium\util\String;
-use lithium\core\Libraries;
 use lithium\util\Inflector;
 use InvalidArgumentException;
 
@@ -143,7 +142,7 @@ abstract class Database extends \lithium\data\Source {
 			'host'       => 'localhost',
 			'login'      => 'root',
 			'password'   => '',
-			'database'   => null,
+			'database'   => null
 		);
 		$this->_strings += array(
 			'read' => 'SELECT {:fields} FROM {:source} {:alias} {:joins} {:conditions} {:group} ' .
@@ -281,7 +280,7 @@ abstract class Database extends \lithium\data\Source {
 					return $records;
 				case 'item':
 					return $self->item($query->model(), array(), compact('query', 'result') + array(
-						'class' => 'set',
+						'class' => 'set'
 					));
 			}
 		});
@@ -500,7 +499,7 @@ abstract class Database extends \lithium\data\Source {
 				return $this->name($key) . ' = ' . $this->value($value);
 			case is_numeric($key) && is_array($value):
 				$result = array();
-				foreach($value as $cField => $cValue) {
+				foreach ($value as $cField => $cValue) {
 					$result[] = $this->_processConditions($cField, $cValue, $schema, $glue);
 				}
 				return '(' . implode(' ' . $glue . ' ', $result) . ')';
@@ -511,7 +510,7 @@ abstract class Database extends \lithium\data\Source {
 				$result = array();
 				$glue = strtoupper($key);
 
-				foreach($value as $cField => $cValue) {
+				foreach ($value as $cField => $cValue) {
 					$result[] = $this->_processConditions($cField, $cValue, $schema, $glue);
 				}
 				return '(' . implode(' ' . $glue . ' ', $result) . ')';

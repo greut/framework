@@ -56,7 +56,7 @@ class File extends \lithium\core\Object {
 			'path' => Libraries::get(true, 'resources') . '/tmp/logs',
 			'timestamp' => 'Y-m-d H:i:s',
 			'file' => function($data, $config) { return "{$data['priority']}.log"; },
-			'format' => "{:timestamp} {:message}\n",
+			'format' => "{:timestamp} {:message}\n"
 		);
 		parent::__construct($config + $defaults);
 	}
@@ -67,7 +67,7 @@ class File extends \lithium\core\Object {
 	 * @see lithium\analysis\Logger::$_priorities
 	 * @param string $priority The message priority. See `Logger::$_priorities`.
 	 * @param string $message The message to write to the log.
-	 * @return closure Returns a closure that writes to the log, which can be wrapped in filters.
+	 * @return closure Function returning boolean `true` on successful write, `false` otherwise.
 	 */
 	public function write($priority, $message) {
 		$config = $this->_config;
