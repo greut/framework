@@ -146,10 +146,9 @@ class FirePhp extends \lithium\core\Object {
 	 *                 the current request. See the `bind()` method.
 	 */
 	public function write($priority, $message) {
-		$_self =& $this;
-		$_response =& $this->_response;
+		$_self = $this;
 
-		return function($self, $params) use (&$_self, $_response) {
+		return function($self, $params) use (&$_self) {
 			$priority = $params['priority'];
 			$message = $params['message'];
 			$message = $_self->invokeMethod('_format', array($priority, $message));
